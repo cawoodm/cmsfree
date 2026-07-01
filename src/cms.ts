@@ -370,11 +370,26 @@ function escapeHtml(s: string): string {
   )
 }
 
-// Published URL for a route (real static links, not hash routes).
+// Published URL for a route (real static links, not hash routes). Root-absolute;
+// used for edit-mode/dev navigation (exitEditMode), which runs at the site root.
 function routeToUrl(route: string): string {
   if (route === '') return '/'
   const segs = route.split('/')
   return segs.length === 1 ? `/${segs[0]}/` : `/${segs[0]}/${segs[1]}.html`
+}
+
+// A route's page path RELATIVE to the publish/ root (no leading slash).
+function routeToRelTarget(route: string): string {
+  if (route === '') return ''
+  const segs = route.split('/')
+  return segs.length === 1 ? `${segs[0]}/` : `${segs[0]}/${segs[1]}.html`
+}
+
+// A route's href from a page whose depth prefix is `base` ('' for home, '../'
+// for section/block pages). Keeps the published site path-agnostic.
+function routeHref(route: string, base: string): string {
+  const t = routeToRelTarget(route)
+  return t === '' ? base || './' : base + t
 }
 
 // Output file for a route within the site root.
@@ -403,11 +418,11 @@ function modelRoutes(): { route: string; path: string }[] {
   return out
 }
 
-function buildNavHtml(sections: Section[], route: string): string {
+function buildNavHtml(sections: Section[], route: string, base: string): string {
   const items = sections
     .map(
       (s) =>
-        `<li><a href="${routeToUrl(s.slug)}"${route === s.slug ? ' class="active"' : ''}>${escapeHtml(s.title)}</a></li>`,
+        `<li><a href="${routeHref(s.slug, base)}"${route === s.slug ? ' class="active"' : ''}>${escapeHtml(s.title)}</a></li>`,
     )
     .join('')
   return `<ul>${items}</ul>`
@@ -440,25 +455,26 @@ function buildPage(
   if (contentHost) contentHost.innerHTML = opts.contentHtml
   if (!opts.isHome)
     doc.querySelectorAll('[data-cms-home-only]').forEach((el) => el.remove())
-  // Turn hash routes (#/about-us) into real static links everywhere in the doc.
+  // All output paths are RELATIVE to this page, so the site is portable to any
+  // subpath (GitHub project pages), the domain root, or file://. Every page is
+  // either home (depth 0) or a section/block (depth 1), hence base '' or '../'.
+  const base = opts.isHome ? '' : '../'
+  // Turn hash routes (#/about-us) into relative static links everywhere.
   doc.querySelectorAll<HTMLAnchorElement>('a[href^="#/"]').forEach((a) => {
-    a.setAttribute(
-      'href',
-      routeToUrl(a.getAttribute('href')!.slice(2).replace(/\/$/, '')),
-    )
+    a.setAttribute('href', routeHref(a.getAttribute('href')!.slice(2).replace(/\/$/, ''), base))
   })
-  // Root-absolute the relative asset paths so they resolve at any page depth.
+  // Rebase root-absolute asset paths (/css, /images) to be relative to the page.
   doc.querySelectorAll('[src],[href]').forEach((el) => {
     const attr = el.hasAttribute('src') ? 'src' : 'href'
     const v = el.getAttribute(attr) || ''
-    if (v === '' || /^(https?:|mailto:|tel:|#|\/)/i.test(v)) return
-    el.setAttribute(attr, '/' + v)
+    if (!v.startsWith('/') || v.startsWith('//')) return // external / already relative
+    el.setAttribute(attr, base + v.slice(1))
   })
   let html = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML
-  // The dormant sleeper: comment placeholder → production script.
+  // The dormant sleeper: comment placeholder → production script (relative).
   return html.replace(
     /<!--\s*cms:entry\s*-->/g,
-    '<script src="/cms.js"></script>',
+    `<script src="${base}cms.js"></script>`,
   )
 }
 
@@ -491,9 +507,10 @@ async function publishSite(): Promise<void> {
       const title =
         parseFrontmatter(text).title ||
         (route === '' ? 'Home' : titleize(route.split('/').pop()!))
+      const base = route === '' ? '' : '../'
       const html = buildPage(template, {
         title,
-        navHtml: buildNavHtml(sections, route.includes('/') ? '' : route),
+        navHtml: buildNavHtml(sections, route.includes('/') ? '' : route, base),
         contentHtml: marked.parse(body) as string,
         isHome: route === '',
       })

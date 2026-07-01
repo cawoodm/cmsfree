@@ -3,7 +3,7 @@ title: About Us
 order: 1
 ---
 
-# About Us
+# About Us1
 
 Hearth & Wheat1 is a family bakery run by the Alden family — three generations, one recipe book, and a lot of flour under the fingernails.
 

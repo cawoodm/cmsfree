@@ -1,14 +1,18 @@
 import { defineConfig } from 'vite'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 
 const repoRoot = dirname(fileURLToPath(import.meta.url))
 // Absolute, forward-slashed path to the CMS entry for Vite's /@fs/ dev URL.
 const cmsEntry = resolve(repoRoot, 'src/cms.ts').replace(/\\/g, '/')
+// The single layout template — served at / in dev and used by Publish.
+const templatePath = resolve(repoRoot, 'example-site/content/template.html')
 
 export default defineConfig({
-  // The dev server serves the example site's PUBLISHED output — exactly what a
-  // real visitor sees. The CMS is injected on top (see the dev plugin below).
+  // Root is the published output, so /css, /images, /cms.js and the generated
+  // /section/ pages resolve as static files. The `/` route itself is overridden
+  // to serve the single layout template (see the cms-serve-template plugin).
   root: resolve(repoRoot, 'example-site/publish'),
   publicDir: false,
 
@@ -25,10 +29,33 @@ export default defineConfig({
 
   plugins: [
     {
+      // DEV ONLY: serve the SINGLE layout template (content/template.html) at /,
+      // so editing runs on exactly the same shell that Publish generates from.
+      // Assets (/css, /images) and generated pages (/about-us/…) still come from
+      // the publish/ root. Runs before Vite's own html serving.
+      name: 'cms-serve-template',
+      apply: 'serve',
+      configureServer(server) {
+        server.middlewares.use(async (req, res, next) => {
+          const path = (req.url || '/').split('?')[0]
+          if (path !== '/' && path !== '/index.html') return next()
+          try {
+            const raw = readFileSync(templatePath, 'utf8')
+            const html = await server.transformIndexHtml(req.url || '/', raw)
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'text/html')
+            res.end(html)
+          } catch (err) {
+            next(err as Error)
+          }
+        })
+      },
+    },
+    {
       // DEV ONLY: inject the CMS as a hot-reloading ES module sourced from the
-      // TypeScript entry. The published index.html carries a `<!-- cms:entry -->`
-      // placeholder; the Publish step will instead replace it with the built
-      // `<script src="cms.js">`. Same HTML, two fill-ins.
+      // TypeScript entry. The template carries a `<!-- cms:entry -->` placeholder;
+      // Publish instead replaces it with the built `<script src="cms.js">`. This
+      // handles both (and the generated pages served for /section/ URLs).
       name: 'cms-dev-inject',
       apply: 'serve',
       transformIndexHtml(html) {

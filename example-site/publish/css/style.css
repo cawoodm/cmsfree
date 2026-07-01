@@ -220,6 +220,81 @@ main {
   margin-left: 0.5rem;
 }
 .cms-publish:hover { background: var(--cream); color: var(--brown); }
+.cms-deploy {
+  border: 1px solid var(--wheat);
+  background: transparent;
+  color: var(--wheat);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.4rem 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+.cms-deploy:hover:not(:disabled) { background: var(--wheat); color: var(--brown); }
+.cms-deploy:disabled { opacity: 0.5; cursor: default; }
+.cms-gear {
+  border: none;
+  background: transparent;
+  color: var(--cream);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  margin-left: 0.4rem;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.cms-gear:hover { background: rgba(255,255,255,0.15); }
+
+/* GitHub settings dialog */
+#cms-settings {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  max-width: 460px;
+  width: 92vw;
+  box-shadow: 0 20px 60px rgba(74,46,32,0.35);
+  color: var(--brown);
+}
+#cms-settings::backdrop { background: rgba(74,46,32,0.45); }
+.cms-settings-form { padding: 1.75rem; display: flex; flex-direction: column; gap: 0.9rem; }
+.cms-settings-form h2 { margin: 0; font-size: 1.3rem; }
+.cms-settings-note { margin: 0; color: var(--terracotta-deep); font-size: 0.85rem; min-height: 0; }
+.cms-settings-note:empty { display: none; }
+.cms-settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.cms-settings-form label span {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--brown-soft);
+}
+.cms-settings-form input {
+  font: inherit;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid rgba(74,46,32,0.3);
+  border-radius: 8px;
+}
+.cms-settings-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
+.cms-done {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--cream);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cream);
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+.cms-done:hover { background: var(--cream); color: var(--brown); }
 
 .cms-editor {
   width: 100%;

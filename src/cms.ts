@@ -839,6 +839,15 @@ function openEditor(): void {
   const textarea = document.createElement('textarea')
   textarea.className = 'cms-editor'
   textarea.value = currentText
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      closeEditor(false)
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      closeEditor(true, textarea.value)
+    }
+  })
 
   const actions = document.createElement('div')
   actions.className = 'cms-editor-actions'

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" width="700" height="420">
+  <rect width="700" height="420" fill="#F1E3C9"/>
+
+  <!-- cake -->
+  <g transform="translate(350,260)">
+    <rect x="-150" y="20" width="300" height="70" rx="8" fill="#C1663B"/>
+    <rect x="-115" y="-40" width="230" height="70" rx="8" fill="#D9A653"/>
+    <rect x="-80" y="-95" width="160" height="65" rx="8" fill="#F3C969"/>
+    <rect x="-150" y="20" width="300" height="14" fill="#F6E7CF" opacity="0.5"/>
+    <rect x="-115" y="-40" width="230" height="12" fill="#F6E7CF" opacity="0.5"/>
+
+    <!-- candles -->
+    <g>
+      <rect x="-6" y="-150" width="12" height="40" fill="#8A9B6E"/>
+      <path d="M0 -158 Q-6 -170 0 -180 Q6 -170 0 -158 Z" fill="#F3C969"/>
+      <rect x="-46" y="-140" width="12" height="30" fill="#C1663B"/>
+      <path d="M-40 -148 Q-46 -160 -40 -168 Q-34 -160 -40 -148 Z" fill="#F3C969"/>
+      <rect x="34" y="-140" width="12" height="30" fill="#8A5A2B"/>
+      <path d="M40 -148 Q34 -160 40 -168 Q46 -160 40 -148 Z" fill="#F3C969"/>
+    </g>
+  </g>
+</svg>

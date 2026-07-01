@@ -1,0 +1,16 @@
+{
+  "name": "cmsfree",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview example-site/publish"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "marked": "^15.0.12"
+  }
+}

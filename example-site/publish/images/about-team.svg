@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" width="700" height="420">
+  <rect width="700" height="420" fill="#EFE1C6"/>
+
+  <!-- three figures -->
+  <g transform="translate(160,150)">
+    <circle cx="0" cy="0" r="38" fill="#E0B679"/>
+    <rect x="-46" y="34" width="92" height="140" rx="30" fill="#8A5A2B"/>
+  </g>
+  <g transform="translate(350,120)">
+    <circle cx="0" cy="0" r="44" fill="#D9A653"/>
+    <rect x="-54" y="40" width="108" height="160" rx="34" fill="#C1663B"/>
+  </g>
+  <g transform="translate(540,150)">
+    <circle cx="0" cy="0" r="38" fill="#E0B679"/>
+    <rect x="-46" y="34" width="92" height="140" rx="30" fill="#4A2E20"/>
+  </g>
+
+  <!-- rolling pin motif -->
+  <g transform="translate(350,330)">
+    <rect x="-120" y="-8" width="240" height="16" rx="8" fill="#8A5A2B"/>
+    <circle cx="-128" cy="0" r="12" fill="#4A2E20"/>
+    <circle cx="128" cy="0" r="12" fill="#4A2E20"/>
+  </g>
+</svg>

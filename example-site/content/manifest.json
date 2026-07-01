@@ -1,0 +1,22 @@
+[
+  {
+    "slug": "about-us",
+    "title": "About Us",
+    "order": 1
+  },
+  {
+    "slug": "history",
+    "title": "Our History",
+    "order": 2
+  },
+  {
+    "slug": "services",
+    "title": "Services",
+    "order": 3
+  },
+  {
+    "slug": "contact",
+    "title": "Contact",
+    "order": 4
+  }
+]

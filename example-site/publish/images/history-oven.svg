@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" width="700" height="420">
+  <rect width="700" height="420" fill="#F1E3C9"/>
+
+  <!-- brick oven -->
+  <g transform="translate(350,240)">
+    <ellipse cx="0" cy="90" rx="220" ry="40" fill="#B5651D"/>
+    <path d="M-220 90 C-220 -60 220 -60 220 90 Z" fill="#C1663B"/>
+    <path d="M-220 90 C-220 -60 220 -60 220 90 Z" fill="none" stroke="#8A5A2B" stroke-width="3" stroke-dasharray="14 8"/>
+    <ellipse cx="0" cy="90" rx="90" ry="34" fill="#4A2E20"/>
+    <ellipse cx="0" cy="90" rx="70" ry="26" fill="#2E1C14"/>
+    <path d="M-40 78 Q0 40 40 78" fill="#F3C969" opacity="0.85"/>
+  </g>
+
+  <!-- chimney smoke -->
+  <g fill="none" stroke="#C7BBA3" stroke-width="8" stroke-linecap="round">
+    <path d="M330 40 Q320 10 340 -10"/>
+    <path d="M360 50 Q350 20 372 0"/>
+  </g>
+</svg>

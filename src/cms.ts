@@ -58,6 +58,37 @@ function exitEditMode(): void {
   location.href = routeToUrl(currentRoute())
 }
 
+// Once a browser has successfully entered edit mode we remember it, so every
+// page (view mode) offers a re-entry pencil. Per-browser; cleared via devtools.
+const EDITOR_FLAG = 'cmsfree:editor'
+
+// Re-enter edit mode on the CURRENT page: add `?edit` (keeping path + hash).
+function enterEditMode(): void {
+  const sep = location.search ? '&' : '?'
+  location.href = location.pathname + location.search + sep + 'edit' + location.hash
+}
+
+// A small fixed pencil at the top-left corner (view mode, returning editors).
+// Self-contained styling so it works on any published page regardless of CSS.
+function showEditLauncher(): void {
+  if (document.getElementById('cms-launch')) return
+  const btn = document.createElement('button')
+  btn.id = 'cms-launch'
+  btn.type = 'button'
+  btn.title = 'Edit this site'
+  btn.setAttribute('aria-label', 'Edit this site')
+  btn.textContent = '✎'
+  btn.style.cssText =
+    'position:fixed;top:0;left:0;z-index:2147483647;width:26px;height:26px;' +
+    'padding:0;border:none;border-bottom-right-radius:8px;cursor:pointer;' +
+    'background:#4A2E20;color:#FBF1E4;font:14px/26px system-ui,sans-serif;' +
+    'opacity:0.35;transition:opacity .15s'
+  btn.addEventListener('mouseenter', () => (btn.style.opacity = '1'))
+  btn.addEventListener('mouseleave', () => (btn.style.opacity = '0.35'))
+  btn.addEventListener('click', enterEditMode)
+  document.body.appendChild(btn)
+}
+
 // ---------------------------------------------------------------------------
 // Top edit bar — persistent chrome with status + Save. Never fail silently.
 //   [ status message ] [ transient action ] .......... [ Save ]
@@ -160,6 +191,7 @@ interface GhSettings {
   owner: string
   repo: string
   branch: string
+  subdir: string
   commitPrefix: string
 }
 const GH_KEY = 'cmsfree:github'
@@ -175,7 +207,8 @@ function loadGhSettings(): GhSettings {
     token: s.token || '',
     owner: s.owner || '',
     repo: s.repo || '',
-    branch: s.branch || 'gh-pages',
+    branch: s.branch || 'main',
+    subdir: s.subdir || '',
     commitPrefix: s.commitPrefix || 'Publish site',
   }
 }
@@ -198,7 +231,10 @@ function openSettingsDialog(note?: string): void {
           <input name="token" type="password" autocomplete="off" placeholder="ghp_…"></label>
         <label>Owner <span>user or org</span><input name="owner" placeholder="octocat"></label>
         <label>Repository<input name="repo" placeholder="my-site"></label>
-        <label>Branch<input name="branch" placeholder="gh-pages"></label>
+        <label>Branch<input name="branch" placeholder="main"></label>
+        <label>Subdirectory
+          <span>optional — deploy into this folder of the branch instead of its root; other paths on the branch are left untouched</span>
+          <input name="subdir" placeholder="e.g. my-site"></label>
         <label>Commit message prefix<input name="commitPrefix" placeholder="Publish site"></label>
         <div class="cms-settings-actions">
           <button value="cancel" class="cms-btn cms-btn-cancel" type="submit">Cancel</button>
@@ -215,7 +251,10 @@ function openSettingsDialog(note?: string): void {
         token: String(fd.get('token') || ''),
         owner: String(fd.get('owner') || '').trim(),
         repo: String(fd.get('repo') || '').trim(),
-        branch: String(fd.get('branch') || '').trim() || 'gh-pages',
+        branch: String(fd.get('branch') || '').trim() || 'main',
+        subdir: String(fd.get('subdir') || '')
+          .trim()
+          .replace(/^\/+|\/+$/g, ''),
         commitPrefix:
           String(fd.get('commitPrefix') || '').trim() || 'Publish site',
       })
@@ -228,6 +267,7 @@ function openSettingsDialog(note?: string): void {
   ;(form.elements.namedItem('owner') as HTMLInputElement).value = s.owner
   ;(form.elements.namedItem('repo') as HTMLInputElement).value = s.repo
   ;(form.elements.namedItem('branch') as HTMLInputElement).value = s.branch
+  ;(form.elements.namedItem('subdir') as HTMLInputElement).value = s.subdir
   ;(form.elements.namedItem('commitPrefix') as HTMLInputElement).value =
     s.commitPrefix
   ;(dlg.querySelector('.cms-settings-note') as HTMLElement).textContent =
@@ -303,6 +343,7 @@ async function deployToGitHub(): Promise<void> {
     return
   }
   const gitBase = `/repos/${s.owner}/${s.repo}/git`
+  const prefix = s.subdir ? `${s.subdir}/` : ''
   const btn = document.querySelector(
     '#cms-banner .cms-deploy',
   ) as HTMLButtonElement | null
@@ -332,7 +373,7 @@ async function deployToGitHub(): Promise<void> {
         content: f.base64,
         encoding: 'base64',
       })
-      tree.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha })
+      tree.push({ path: prefix + f.path, mode: '100644', type: 'blob', sha: blob.sha })
     }
     // 2. Find the branch head, if the branch already exists.
     let parents: string[] = []
@@ -344,8 +385,25 @@ async function deployToGitHub(): Promise<void> {
     } catch {
       /* branch doesn't exist yet → first (root) commit */
     }
-    // 3. Fresh tree (no base_tree) so publish/ fully replaces the branch contents.
-    const newTree = await gh(s.token, 'POST', `${gitBase}/trees`, { tree })
+    // 3. Build the full tree. With no subdirectory, replace the whole branch
+    // (matches every prior version of this feature). With a subdirectory, keep
+    // every path outside it as-is — other projects can share the same branch —
+    // and only replace what's under the subdirectory (which also prunes files
+    // removed from this site, since none of its old paths are carried over).
+    let entries = tree
+    if (prefix && branchExists) {
+      const headCommit = await gh(s.token, 'GET', `${gitBase}/commits/${parents[0]}`)
+      const baseTree = await gh(
+        s.token,
+        'GET',
+        `${gitBase}/trees/${headCommit.tree.sha}?recursive=1`,
+      )
+      const outside = (
+        baseTree.tree as { path: string; mode: string; type: string; sha: string }[]
+      ).filter((e) => e.type === 'blob' && !e.path.startsWith(prefix))
+      entries = [...outside, ...tree]
+    }
+    const newTree = await gh(s.token, 'POST', `${gitBase}/trees`, { tree: entries })
     // 4. Commit.
     const commit = await gh(s.token, 'POST', `${gitBase}/commits`, {
       message,
@@ -373,7 +431,7 @@ async function deployToGitHub(): Promise<void> {
       /* already enabled or insufficient scope — not fatal */
     }
     setStatus(
-      `Deployed "${message}" to ${s.owner}/${s.repo}@${s.branch}. Live at https://${s.owner}.github.io/${s.repo}/`,
+      `Deployed "${message}" to ${s.owner}/${s.repo}@${s.branch}${prefix ? '/' + s.subdir : ''}. Live at https://${s.owner}.github.io/${s.repo}/${prefix}`,
     )
   } catch (err) {
     setStatus('Deploy failed: ' + (err as Error).message)
@@ -586,7 +644,7 @@ async function publishSite(): Promise<void> {
       const html = buildPage(template, {
         title,
         navHtml: buildNavHtml(sections, route.includes('/') ? '' : route, base),
-        contentHtml: marked.parse(body) as string,
+        contentHtml: renderBody(body, slugOfPath(path), path),
         isHome: route === '',
       })
       await writeFile(routeToOutPath(route), html)
@@ -934,15 +992,158 @@ function titleize(slug: string): string {
   return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+// Turn a simple glob (only '*' = "any run of non-slash chars") into a RegExp
+// anchored to match a whole filename.
+function globToRegExp(pattern: string): RegExp {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^${escaped.replace(/\*/g, '[^/]*')}$`)
+}
+
+// Sibling .md files in content/{sectionSlug}/ whose filename matches the glob,
+// excluding the including file itself, sorted like scanSections() (order,
+// then title).
+function matchSectionFiles(
+  sectionSlug: string,
+  pattern: string,
+  excludePath: string,
+): { text: string }[] {
+  const prefix = `content/${sectionSlug}/`
+  const re = globToRegExp(pattern)
+  const out: { text: string; order: number; title: string }[] = []
+  for (const [path, text] of model) {
+    if (!path.startsWith(prefix) || path === excludePath) continue
+    const name = path.slice(prefix.length)
+    if (name.includes('/') || !re.test(name)) continue
+    const fm = parseFrontmatter(text)
+    out.push({
+      text,
+      order: fm.order ?? Number.MAX_SAFE_INTEGER,
+      title: fm.title || titleize(name.replace(/\.md$/, '')),
+    })
+  }
+  out.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
+  return out
+}
+
+// Render a page body to HTML, expanding [include](glob) directives (a line
+// containing exactly that). Shared by edit-mode preview and Publish so both
+// stay in sync. If sectionSlug is '' (e.g. the home page has no section
+// folder), directives are left as literal text — they degrade to a harmless
+// markdown link rather than silently vanishing, since that's not the
+// "zero matches" case the directive is meant to handle.
+function renderBody(body: string, sectionSlug: string, selfPath: string): string {
+  const placeholders: string[] = []
+  const withPlaceholders = body.replace(
+    /^\[include\]\(([^)\s]+)\)[ \t]*$/gm,
+    (match, pattern: string) => {
+      if (!sectionSlug) return match
+      const token = `token-${placeholders.length}`
+      const html = matchSectionFiles(sectionSlug, pattern, selfPath)
+        .map((f) => {
+          const { body: fBody } = splitFrontmatter(f.text)
+          return `<article class="cms-include">${marked.parse(fBody) as string}</article>`
+        })
+        .join('')
+      placeholders.push(html)
+      return `<div data-cms-include="${token}"></div>`
+    },
+  )
+  let html = marked.parse(withPlaceholders) as string
+  placeholders.forEach((inc, i) => {
+    html = html.replace(`<div data-cms-include="token-${i}"></div>`, inc)
+  })
+  return html
+}
+
 function contentEl(): HTMLElement | null {
   return document.querySelector('[x-cms-content]')
+}
+
+// ---------------------------------------------------------------------------
+// Edit-mode assets — read from disk (FSA) as in-memory blob URLs, so nothing is
+// fetched over HTTP from content/ or publish/. Reflects live content/_assets.
+// ---------------------------------------------------------------------------
+const ASSET_MIME: Record<string, string> = {
+  css: 'text/css',
+  js: 'text/javascript',
+  svg: 'image/svg+xml',
+  ico: 'image/x-icon',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  woff2: 'font/woff2',
+  woff: 'font/woff',
+  json: 'application/json',
+}
+const assetUrls = new Map<string, string>() // 'css/style.css' -> blob: URL
+
+function mimeFor(name: string): string {
+  return ASSET_MIME[name.split('.').pop()?.toLowerCase() || ''] || 'application/octet-stream'
+}
+
+// Read content/_assets recursively into blob URLs keyed by root-relative path.
+async function loadAssetUrls(): Promise<void> {
+  for (const url of assetUrls.values()) URL.revokeObjectURL(url)
+  assetUrls.clear()
+  let dir: FileSystemDirectoryHandle
+  try {
+    dir = await resolveDir(['content', '_assets'])
+  } catch {
+    return // no _assets — leave the map empty
+  }
+  async function walk(d: FileSystemDirectoryHandle, prefix: string): Promise<void> {
+    for await (const [name, h] of (d as any).entries() as Entries) {
+      const rel = prefix ? `${prefix}/${name}` : name
+      if (h.kind === 'file') {
+        const buf = await (await (h as FileSystemFileHandle).getFile()).arrayBuffer()
+        assetUrls.set(rel, URL.createObjectURL(new Blob([buf], { type: mimeFor(name) })))
+      } else {
+        await walk(h as FileSystemDirectoryHandle, rel)
+      }
+    }
+  }
+  await walk(dir, '')
+}
+
+// Rewrite [src]/[href] pointing at a bundled asset to its in-memory blob URL.
+// Leaves external (http, //, data:, blob:, mailto:, #, /@fs, /@vite) refs alone.
+function rewriteAssetRefs(scope: ParentNode): void {
+  scope.querySelectorAll<HTMLElement>('[src],[href]').forEach((el) => {
+    const attr = el.hasAttribute('src') ? 'src' : 'href'
+    const v = el.getAttribute(attr) || ''
+    if (!v || /^(https?:|blob:|data:|mailto:|tel:|#)/i.test(v) || v.startsWith('//')) return
+    const url = assetUrls.get(v.replace(/^\/+/, ''))
+    if (url) el.setAttribute(attr, url)
+  })
+}
+
+// EDIT MODE: rebuild the page from the on-disk template (read via FSA), so the
+// dev/static server never has to serve content/. Preserves the live <head>
+// (running module + HMR client); adds the template's stylesheets/title.
+async function applyTemplateShell(): Promise<void> {
+  const doc = new DOMParser().parseFromString(
+    await readFile('content/template.html'),
+    'text/html',
+  )
+  const have = new Set(
+    [...document.head.querySelectorAll('link')].map((l) => l.getAttribute('href')),
+  )
+  doc.head.querySelectorAll('link').forEach((l) => {
+    if (!have.has(l.getAttribute('href'))) document.head.appendChild(document.importNode(l, true))
+  })
+  if (doc.title) document.title = doc.title
+  document.body.replaceWith(document.importNode(doc.body, true))
+  rewriteAssetRefs(document) // point css/images/favicon at blob URLs (from disk)
 }
 
 function renderCurrent(): void {
   const el = contentEl()
   if (!el) return
   const { body } = splitFrontmatter(currentText)
-  el.innerHTML = marked.parse(body) as string
+  el.innerHTML = renderBody(body, currentSectionSlug(), currentPath)
+  rewriteAssetRefs(el) // markdown-referenced images load from disk too
   addEditAffordance()
 }
 
@@ -967,9 +1168,13 @@ function scanSections(): Section[] {
   return out
 }
 
-function currentSectionSlug(): string {
-  const m = /^content\/([^/]+)\//.exec(currentPath)
+function slugOfPath(path: string): string {
+  const m = /^content\/([^/]+)\//.exec(path)
   return m ? m[1] : ''
+}
+
+function currentSectionSlug(): string {
+  return slugOfPath(currentPath)
 }
 
 function currentIsBlock(): boolean {
@@ -1261,7 +1466,14 @@ function routeFromAnchor(a: HTMLAnchorElement): string | null {
 }
 
 function currentRoute(): string {
-  return location.hash.replace(/^#\/?/, '').replace(/\/$/, '')
+  const hash = location.hash.replace(/^#\/?/, '').replace(/\/$/, '')
+  if (hash) return hash
+  // No hash (e.g. entered ?edit directly on a published sub-page like
+  // /about-us/): derive the route from the pathname so edit mode lands there.
+  return location.pathname
+    .replace(/index\.html$/, '')
+    .replace(/\.html$/, '')
+    .replace(/^\/+|\/+$/g, '')
 }
 
 function updateActiveNav(route: string): void {
@@ -1325,12 +1537,24 @@ function onNavClick(e: MouseEvent): void {
 // Bootstrap
 // ---------------------------------------------------------------------------
 async function boot(): Promise<void> {
-  if (!isEditMode()) return // dormant in view mode
+  if (!isEditMode()) {
+    // View mode: dormant, except a returning editor gets a re-entry pencil.
+    if (localStorage.getItem(EDITOR_FLAG) === '1') showEditLauncher()
+    return
+  }
   setStatus('cmsfree — connecting…') // show the edit bar immediately
   const ok = await ensureConnected()
   if (!ok) return
   connected = true
+  localStorage.setItem(EDITOR_FLAG, '1') // remember this browser is an editor
   await loadModel()
+  await loadAssetUrls() // read content/_assets from disk → in-memory blob URLs
+  try {
+    await applyTemplateShell() // rebuild the page from content/template.html (disk)
+  } catch (err) {
+    setStatus('Could not read content/template.html: ' + (err as Error).message)
+    return
+  }
   setStatus('Connected. Edits stay in memory until you Save.')
   updateSaveButton() // now that we're connected, reveal Save + Publish
   document.addEventListener('click', onNavClick)

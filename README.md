@@ -1,0 +1,64 @@
+# cmsfree ✎
+
+**A tiny CMS with no backend.** Edit your static site _in the browser_, save straight to your local disk, publish plain HTML that runs anywhere and even commit the published files to github all from your browser.
+
+Add `?edit` to any page and a dormant script wakes up, connects to your local project folder (via the browser's File System Access API), and turns the live site into an editor. Your content is just markdown files. There's no server, no database, no lock-in — the published site is static HTML you can host on anything (or push to GitHub Pages with one click).
+
+```
+your-site/
+  content/            ← what you edit (markdown + one template.html + _assets)
+    index.md
+    about-us/index.md
+    services/index.md
+  publish/            ← generated static site (deploy this anywhere)
+  cms.js              ← the ~20 kB "sleeper" (does nothing until ?edit)
+```
+
+## How it works
+
+- **View** — plain static HTML from `publish/`. Zero JavaScript needed; `cms.js` just sleeps.
+- **Edit** — visit `?edit`. The CMS reads `content/` **from disk** and rebuilds the page in memory: generated nav, live markdown rendering, inline editing, create/rename/delete sections & pages. Nothing is written until you hit **Save**.
+- **Publish** — regenerates `publish/` (one static page per route) from a single `content/template.html`.
+- **Deploy** — pushes `publish/` to GitHub Pages via the GitHub API.
+
+## Content model
+
+- A **folder** under `content/` with an `index.md` is a **section** (appears in the nav).
+- Any other `.md` in that folder is an unlisted **block/page** (link to it from content).
+- Optional frontmatter: `title:` and `order:`. `_folders` and `.files` are ignored.
+- `content/template.html` is the single source of layout for every page.
+
+## Get started
+
+**Requirements:** Node.js and a Chromium browser (Chrome/Edge — the File System Access API).
+
+```bash
+npm install
+npm run dev            # dev server with hot-reload (http://localhost:5173)
+```
+
+1. Open **http://localhost:5173/?edit**
+2. Click **Connect folder** and pick the site root (e.g. `example-site/`)
+3. Edit a page (✎), add a section (＋), etc. → **Save** (writes to `content/`)
+4. **Publish** → generates `example-site/publish/`
+
+```bash
+npm run build          # bundle the CMS → cms.js (after changing src/)
+npm run preview        # serve publish/ on a plain static server (any host works)
+```
+
+Once you've entered edit mode, a small ✎ pins to the top-left of every page so you can jump back in anytime.
+
+## Deploy to GitHub Pages
+
+In edit mode, open **⚙ Settings**, enter a GitHub token + owner/repo/branch, then hit **Deploy**. It commits `publish/` to the branch (commit message = your prefix + version). Point GitHub Pages at that branch and you're live.
+
+## Under the hood
+
+- `src/` — the CMS engine (TypeScript), bundled by **Vite** into a single self-contained `cms.js`. Vite is only a dev/build tool — **nothing depends on it at runtime**.
+- Markdown via [marked](https://github.com/markedjs/marked); everything else is vanilla DOM + the File System Access API.
+- The published site uses **relative URLs**, so it works at a domain root, a subpath (GitHub project pages), or straight from `file://`.
+
+---
+
+_Made for people who want to edit their own site without a dashboard, an account, or a backend._

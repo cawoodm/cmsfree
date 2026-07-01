@@ -51,6 +51,13 @@ function isEditMode(): boolean {
   return new URLSearchParams(location.search).has('edit')
 }
 
+// Leaves edit mode for the published URL of the page being edited (e.g. hash
+// route #/contact → /contact/). The existing beforeunload handler still warns
+// if there are unsaved changes.
+function exitEditMode(): void {
+  location.href = routeToUrl(currentRoute())
+}
+
 // ---------------------------------------------------------------------------
 // Top edit bar — persistent chrome with status + Save. Never fail silently.
 //   [ status message ] [ transient action ] .......... [ Save ]
@@ -78,7 +85,32 @@ function ensureBar(): HTMLElement {
     publish.textContent = 'Publish'
     publish.style.display = 'none'
     publish.addEventListener('click', () => void publishSite())
-    bar.append(msg, actions, spacer, save, publish)
+    const deploy = document.createElement('button')
+    deploy.className = 'cms-deploy'
+    deploy.type = 'button'
+    deploy.textContent = 'Deploy'
+    deploy.title = 'Push publish/ to GitHub Pages'
+    deploy.style.display = 'none'
+    deploy.addEventListener('click', () => void deployToGitHub())
+    const gear = document.createElement('button')
+    gear.className = 'cms-gear'
+    gear.type = 'button'
+    gear.title = 'GitHub deploy settings'
+    gear.setAttribute('aria-label', 'GitHub deploy settings')
+    gear.textContent = '⚙'
+    gear.style.display = 'none'
+    gear.addEventListener('click', () => openSettingsDialog())
+    const done = document.createElement('button')
+    done.className = 'cms-done'
+    done.type = 'button'
+    done.title = 'Exit edit mode'
+    done.setAttribute('aria-label', 'Exit edit mode')
+    done.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+      '<path d="M1 1L13 13M13 1L1 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>' +
+      '</svg>'
+    done.addEventListener('click', () => exitEditMode())
+    bar.append(msg, actions, spacer, save, publish, deploy, gear, done)
     document.body.prepend(bar)
   }
   return bar
@@ -112,6 +144,217 @@ function updateSaveButton(): void {
   save.textContent = dirty ? 'Save' : 'Saved'
   const publish = bar.querySelector('.cms-publish') as HTMLButtonElement
   publish.style.display = connected ? 'inline-block' : 'none'
+  const deploy = bar.querySelector('.cms-deploy') as HTMLButtonElement
+  deploy.style.display = connected ? 'inline-block' : 'none'
+  const gear = bar.querySelector('.cms-gear') as HTMLButtonElement
+  gear.style.display = connected ? 'inline-block' : 'none'
+}
+
+// ---------------------------------------------------------------------------
+// GitHub Pages deploy — push the publish/ tree to a branch via the Git Data
+// API. Settings (token, owner, repo, branch, commit prefix) persist to
+// localStorage and are edited via a dialog. Commit message = prefix + version.
+// ---------------------------------------------------------------------------
+interface GhSettings {
+  token: string
+  owner: string
+  repo: string
+  branch: string
+  commitPrefix: string
+}
+const GH_KEY = 'cmsfree:github'
+
+function loadGhSettings(): GhSettings {
+  let s: Partial<GhSettings> = {}
+  try {
+    s = JSON.parse(localStorage.getItem(GH_KEY) || '{}')
+  } catch {
+    /* ignore malformed */
+  }
+  return {
+    token: s.token || '',
+    owner: s.owner || '',
+    repo: s.repo || '',
+    branch: s.branch || 'gh-pages',
+    commitPrefix: s.commitPrefix || 'Publish site',
+  }
+}
+
+function saveGhSettings(s: GhSettings): void {
+  localStorage.setItem(GH_KEY, JSON.stringify(s))
+}
+
+function openSettingsDialog(note?: string): void {
+  let dlg = document.getElementById('cms-settings') as HTMLDialogElement | null
+  if (!dlg) {
+    dlg = document.createElement('dialog')
+    dlg.id = 'cms-settings'
+    dlg.innerHTML = `
+      <form method="dialog" class="cms-settings-form">
+        <h2>Deploy to GitHub Pages</h2>
+        <p class="cms-settings-note"></p>
+        <label>Personal access token
+          <span>repo scope — stored in this browser's localStorage</span>
+          <input name="token" type="password" autocomplete="off" placeholder="ghp_…"></label>
+        <label>Owner <span>user or org</span><input name="owner" placeholder="octocat"></label>
+        <label>Repository<input name="repo" placeholder="my-site"></label>
+        <label>Branch<input name="branch" placeholder="gh-pages"></label>
+        <label>Commit message prefix<input name="commitPrefix" placeholder="Publish site"></label>
+        <div class="cms-settings-actions">
+          <button value="cancel" class="cms-btn cms-btn-cancel" type="submit">Cancel</button>
+          <button value="save" class="cms-btn cms-btn-save" type="submit">Save</button>
+        </div>
+      </form>`
+    document.body.append(dlg)
+    const form = dlg.querySelector('form') as HTMLFormElement
+    form.addEventListener('submit', (e) => {
+      if (((e as SubmitEvent).submitter as HTMLButtonElement)?.value !== 'save') return
+      const fd = new FormData(form)
+      saveGhSettings({
+        token: String(fd.get('token') || ''),
+        owner: String(fd.get('owner') || '').trim(),
+        repo: String(fd.get('repo') || '').trim(),
+        branch: String(fd.get('branch') || '').trim() || 'gh-pages',
+        commitPrefix: String(fd.get('commitPrefix') || '').trim() || 'Publish site',
+      })
+      setStatus('GitHub deploy settings saved.')
+    })
+  }
+  const s = loadGhSettings()
+  const form = dlg.querySelector('form') as HTMLFormElement
+  ;(form.elements.namedItem('token') as HTMLInputElement).value = s.token
+  ;(form.elements.namedItem('owner') as HTMLInputElement).value = s.owner
+  ;(form.elements.namedItem('repo') as HTMLInputElement).value = s.repo
+  ;(form.elements.namedItem('branch') as HTMLInputElement).value = s.branch
+  ;(form.elements.namedItem('commitPrefix') as HTMLInputElement).value = s.commitPrefix
+  ;(dlg.querySelector('.cms-settings-note') as HTMLElement).textContent = note || ''
+  dlg.showModal()
+}
+
+// base64-encode an ArrayBuffer (handles text + binary assets uniformly).
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+// Recursively read every file under publish/ as {path, base64}.
+async function collectPublishFiles(): Promise<{ path: string; base64: string }[]> {
+  const out: { path: string; base64: string }[] = []
+  async function walk(dir: FileSystemDirectoryHandle, prefix: string): Promise<void> {
+    for await (const [name, h] of (dir as any).entries() as Entries) {
+      const rel = prefix ? `${prefix}/${name}` : name
+      if (h.kind === 'file') {
+        const buf = await (await (h as FileSystemFileHandle).getFile()).arrayBuffer()
+        out.push({ path: rel, base64: toBase64(buf) })
+      } else if (h.kind === 'directory') {
+        await walk(h as FileSystemDirectoryHandle, rel)
+      }
+    }
+  }
+  await walk(await resolveDir(['publish']), '')
+  return out
+}
+
+// Thin GitHub REST helper. Throws with the response body on failure.
+async function gh(token: string, method: string, path: string, body?: unknown): Promise<any> {
+  const res = await fetch(`https://api.github.com${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) {
+    throw new Error(`${method} ${path} → ${res.status} ${(await res.text()).slice(0, 200)}`)
+  }
+  return res.status === 204 ? null : res.json()
+}
+
+async function deployToGitHub(): Promise<void> {
+  const s = loadGhSettings()
+  if (!s.token || !s.owner || !s.repo) {
+    openSettingsDialog('Enter your token, owner and repo to deploy.')
+    return
+  }
+  const gitBase = `/repos/${s.owner}/${s.repo}/git`
+  const btn = document.querySelector('#cms-banner .cms-deploy') as HTMLButtonElement | null
+  if (btn) {
+    btn.disabled = true
+    btn.textContent = 'Deploying…'
+  }
+  try {
+    let version = 0
+    try {
+      version = JSON.parse(await readFile('publish/version.json')).version ?? 0
+    } catch {
+      /* keep 0 */
+    }
+    const message = `${s.commitPrefix} v${version}`
+
+    const files = await collectPublishFiles()
+    if (files.length === 0) throw new Error('publish/ is empty — click Publish first')
+    setStatus(`Deploying ${files.length} files to ${s.owner}/${s.repo}…`)
+
+    // 1. Upload each file as a blob.
+    const tree: { path: string; mode: '100644'; type: 'blob'; sha: string }[] = []
+    for (const f of files) {
+      const blob = await gh(s.token, 'POST', `${gitBase}/blobs`, {
+        content: f.base64,
+        encoding: 'base64',
+      })
+      tree.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha })
+    }
+    // 2. Find the branch head, if the branch already exists.
+    let parents: string[] = []
+    let branchExists = false
+    try {
+      const ref = await gh(s.token, 'GET', `${gitBase}/ref/heads/${s.branch}`)
+      parents = [ref.object.sha]
+      branchExists = true
+    } catch {
+      /* branch doesn't exist yet → first (root) commit */
+    }
+    // 3. Fresh tree (no base_tree) so publish/ fully replaces the branch contents.
+    const newTree = await gh(s.token, 'POST', `${gitBase}/trees`, { tree })
+    // 4. Commit.
+    const commit = await gh(s.token, 'POST', `${gitBase}/commits`, {
+      message,
+      tree: newTree.sha,
+      parents,
+    })
+    // 5. Point the branch at the new commit (create it if new).
+    if (branchExists) {
+      await gh(s.token, 'PATCH', `${gitBase}/refs/heads/${s.branch}`, { sha: commit.sha, force: true })
+    } else {
+      await gh(s.token, 'POST', `${gitBase}/refs`, { ref: `refs/heads/${s.branch}`, sha: commit.sha })
+    }
+    // 6. Best-effort: enable Pages on this branch (ignored if already enabled).
+    try {
+      await gh(s.token, 'POST', `/repos/${s.owner}/${s.repo}/pages`, {
+        source: { branch: s.branch, path: '/' },
+      })
+    } catch {
+      /* already enabled or insufficient scope — not fatal */
+    }
+    setStatus(
+      `Deployed "${message}" to ${s.owner}/${s.repo}@${s.branch}. Live at https://${s.owner}.github.io/${s.repo}/`,
+    )
+  } catch (err) {
+    setStatus('Deploy failed: ' + (err as Error).message)
+  } finally {
+    if (btn) {
+      btn.disabled = false
+      btn.textContent = 'Deploy'
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +424,14 @@ function buildPage(
   },
 ): string {
   const doc = new DOMParser().parseFromString(template, 'text/html')
+  // Strip template comments from the published output, but keep the cms:entry
+  // marker (replaced with the sleeper script after serialization).
+  const walker = doc.createNodeIterator(doc, NodeFilter.SHOW_COMMENT)
+  const comments: Comment[] = []
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) comments.push(n as Comment)
+  comments.forEach((c) => {
+    if (c.data.trim() !== 'cms:entry') c.remove()
+  })
   const titleEl = doc.querySelector('title')
   if (titleEl) titleEl.textContent = opts.title
   const navHost = doc.querySelector('[x-cms-nav]')
@@ -231,7 +482,7 @@ async function publishSite(): Promise<void> {
     btn.textContent = 'Publishing…'
   }
   try {
-    const template = await readFile('publish/index.html')
+    const template = await readFile('content/template.html')
     const sections = scanSections()
     const routes = modelRoutes()
     for (const { route, path } of routes) {
@@ -918,9 +1169,18 @@ function updateActiveNav(route: string): void {
   })
 }
 
+// Show `data-cms-home-only` elements (e.g. the hero) only on the homepage —
+// mirrors what buildPage() does for the published static pages.
+function applyHomeOnly(isHome: boolean): void {
+  document.querySelectorAll<HTMLElement>('[data-cms-home-only]').forEach((el) => {
+    el.style.display = isHome ? '' : 'none'
+  })
+}
+
 function renderRoute(): void {
   if (!loaded) return
   const route = currentRoute()
+  applyHomeOnly(route === '')
   const path = routeToPath(route)
   const text = model.get(path)
   if (text === undefined) {

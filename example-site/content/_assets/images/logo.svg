@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 56" width="220" height="56">
+  <g transform="translate(4,8)">
+    <path d="M20 0 C20 14 8 18 8 32 C8 38 14 40 20 40 C26 40 32 38 32 32 C32 18 20 14 20 0 Z" fill="#D9A653"/>
+    <path d="M20 6 C20 16 12 19 12 30" fill="none" stroke="#8A5A2B" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M20 6 C20 16 28 19 28 30" fill="none" stroke="#8A5A2B" stroke-width="1.4" stroke-linecap="round"/>
+  </g>
+  <text x="48" y="24" font-family="Georgia, 'Times New Roman', serif" font-size="18" fill="#4A2E20" font-weight="600">Hearth &amp; Wheat</text>
+  <text x="48" y="41" font-family="Georgia, 'Times New Roman', serif" font-size="11" fill="#8A6A4A" letter-spacing="2">B A K E R Y</text>
+</svg>

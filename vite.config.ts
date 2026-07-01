@@ -8,22 +8,25 @@ const repoRoot = dirname(fileURLToPath(import.meta.url))
 const cmsEntry = resolve(repoRoot, 'src/cms.ts').replace(/\\/g, '/')
 // The single layout template — served at / in dev and used by Publish.
 const templatePath = resolve(repoRoot, 'example-site/content/template.html')
+// Static asset SOURCE (css, images, favicon, built cms.js). Ignored by the
+// content model (underscore prefix); copied into publish/ by Publish.
+const assetsDir = resolve(repoRoot, 'example-site/content/_assets')
 
-export default defineConfig({
-  // Root is the published output, so /css, /images, /cms.js and the generated
-  // /section/ pages resolve as static files. The `/` route itself is overridden
-  // to serve the single layout template (see the cms-serve-template plugin).
+export default defineConfig(({ command }) => ({
+  // Root is the published output, so generated /section/ pages resolve as static
+  // files. `/` is overridden to serve the single layout template, and static
+  // assets are served from their source in content/_assets (see below).
   root: resolve(repoRoot, 'example-site/publish'),
-  publicDir: false,
+  // In dev, serve /css, /images, /favicon.ico, /cms.js from the asset SOURCE.
+  // At build time this would collide with outDir, so it's disabled there.
+  publicDir: command === 'serve' ? assetsDir : false,
 
   server: {
     // Allow importing src/cms.ts, which lives OUTSIDE the dev root.
     fs: { allow: [repoRoot] },
     // Watch ONLY src/ for changes. Everything under example-site/ is data/output
-    // the CMS reads and writes at runtime (content/, publish/, template, assets) —
-    // never dev module code — so it must not trigger reloads. This also prevents
-    // Save/Publish (which write into publish/) from reloading the page mid-run.
-    // src/cms.ts is outside example-site/ and stays in the module graph → HMR works.
+    // the CMS reads and writes at runtime — never dev module code — so it must
+    // not trigger reloads. src/cms.ts stays in the module graph → HMR works.
     watch: { ignored: ['**/example-site/**'] },
   },
 
@@ -31,8 +34,6 @@ export default defineConfig({
     {
       // DEV ONLY: serve the SINGLE layout template (content/template.html) at /,
       // so editing runs on exactly the same shell that Publish generates from.
-      // Assets (/css, /images) and generated pages (/about-us/…) still come from
-      // the publish/ root. Runs before Vite's own html serving.
       name: 'cms-serve-template',
       apply: 'serve',
       configureServer(server) {
@@ -52,31 +53,27 @@ export default defineConfig({
       },
     },
     {
-      // DEV ONLY: inject the CMS as a hot-reloading ES module sourced from the
-      // TypeScript entry. The template carries a `<!-- cms:entry -->` placeholder;
-      // Publish instead replaces it with the built `<script src="cms.js">`. This
-      // handles both (and the generated pages served for /section/ URLs).
+      // DEV ONLY: inject the CMS as a hot-reloading TS module — replacing either
+      // the `<!-- cms:entry -->` placeholder (template) or the production
+      // `<script src="cms.js">` (generated pages, relative or root-absolute).
       name: 'cms-dev-inject',
       apply: 'serve',
       transformIndexHtml(html) {
-        // In dev, inject the CMS as a hot-reloading TS module — replacing either
-        // the `<!-- cms:entry -->` placeholder (template) OR the production
-        // `<script src="/cms.js">` that Publish writes (generated pages), so HMR
-        // works whether a page is pre- or post-Publish.
         const mod = `<script type="module" src="/@fs/${cmsEntry}"></script>`
         return html
           .replace('<!-- cms:entry -->', mod)
-          .replace(/<script\s+src="\/?cms\.js"><\/script>/g, mod)
+          .replace(/<script\s+src="(?:\.\.\/|\/)?cms\.js"><\/script>/g, mod)
       },
     },
   ],
 
   build: {
-    // Build the CMS as a single self-contained IIFE file, emitted directly into
-    // the example site's publish/ so the generated pages' `<script src="/cms.js">`
-    // resolves. A real site would drop this same file into its own publish/.
-    outDir: resolve(repoRoot, 'example-site/publish'),
-    emptyOutDir: false, // publish/ holds the site too — don't wipe it
+    // Build the CMS as a single self-contained IIFE into the asset SOURCE dir,
+    // so it's the bundle Publish copies into publish/cms.js. `npm run build`
+    // refreshes content/_assets/cms.js after any cms.ts change.
+    outDir: assetsDir,
+    emptyOutDir: false, // _assets also holds css/images/favicon — don't wipe them
+    copyPublicDir: false,
     lib: {
       entry: resolve(repoRoot, 'src/cms.ts'),
       name: 'cmsfree',
@@ -84,4 +81,4 @@ export default defineConfig({
       formats: ['iife'],
     },
   },
-})
+}))

@@ -48,7 +48,7 @@ let currentPath = '' // content-relative path of the loaded route
 // Edit-mode detection
 // ---------------------------------------------------------------------------
 function isEditMode(): boolean {
-  return new URLSearchParams(location.search).has('edit')
+  return new URLSearchParams(location.search.toLowerCase()).has('edit')
 }
 
 // Leaves edit mode for the published URL of the page being edited (e.g. hash
@@ -208,14 +208,16 @@ function openSettingsDialog(note?: string): void {
     document.body.append(dlg)
     const form = dlg.querySelector('form') as HTMLFormElement
     form.addEventListener('submit', (e) => {
-      if (((e as SubmitEvent).submitter as HTMLButtonElement)?.value !== 'save') return
+      if (((e as SubmitEvent).submitter as HTMLButtonElement)?.value !== 'save')
+        return
       const fd = new FormData(form)
       saveGhSettings({
         token: String(fd.get('token') || ''),
         owner: String(fd.get('owner') || '').trim(),
         repo: String(fd.get('repo') || '').trim(),
         branch: String(fd.get('branch') || '').trim() || 'gh-pages',
-        commitPrefix: String(fd.get('commitPrefix') || '').trim() || 'Publish site',
+        commitPrefix:
+          String(fd.get('commitPrefix') || '').trim() || 'Publish site',
       })
       setStatus('GitHub deploy settings saved.')
     })
@@ -226,8 +228,10 @@ function openSettingsDialog(note?: string): void {
   ;(form.elements.namedItem('owner') as HTMLInputElement).value = s.owner
   ;(form.elements.namedItem('repo') as HTMLInputElement).value = s.repo
   ;(form.elements.namedItem('branch') as HTMLInputElement).value = s.branch
-  ;(form.elements.namedItem('commitPrefix') as HTMLInputElement).value = s.commitPrefix
-  ;(dlg.querySelector('.cms-settings-note') as HTMLElement).textContent = note || ''
+  ;(form.elements.namedItem('commitPrefix') as HTMLInputElement).value =
+    s.commitPrefix
+  ;(dlg.querySelector('.cms-settings-note') as HTMLElement).textContent =
+    note || ''
   dlg.showModal()
 }
 
@@ -243,13 +247,20 @@ function toBase64(buf: ArrayBuffer): string {
 }
 
 // Recursively read every file under publish/ as {path, base64}.
-async function collectPublishFiles(): Promise<{ path: string; base64: string }[]> {
+async function collectPublishFiles(): Promise<
+  { path: string; base64: string }[]
+> {
   const out: { path: string; base64: string }[] = []
-  async function walk(dir: FileSystemDirectoryHandle, prefix: string): Promise<void> {
+  async function walk(
+    dir: FileSystemDirectoryHandle,
+    prefix: string,
+  ): Promise<void> {
     for await (const [name, h] of (dir as any).entries() as Entries) {
       const rel = prefix ? `${prefix}/${name}` : name
       if (h.kind === 'file') {
-        const buf = await (await (h as FileSystemFileHandle).getFile()).arrayBuffer()
+        const buf = await (
+          await (h as FileSystemFileHandle).getFile()
+        ).arrayBuffer()
         out.push({ path: rel, base64: toBase64(buf) })
       } else if (h.kind === 'directory') {
         await walk(h as FileSystemDirectoryHandle, rel)
@@ -261,7 +272,12 @@ async function collectPublishFiles(): Promise<{ path: string; base64: string }[]
 }
 
 // Thin GitHub REST helper. Throws with the response body on failure.
-async function gh(token: string, method: string, path: string, body?: unknown): Promise<any> {
+async function gh(
+  token: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<any> {
   const res = await fetch(`https://api.github.com${path}`, {
     method,
     headers: {
@@ -273,7 +289,9 @@ async function gh(token: string, method: string, path: string, body?: unknown): 
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
-    throw new Error(`${method} ${path} → ${res.status} ${(await res.text()).slice(0, 200)}`)
+    throw new Error(
+      `${method} ${path} → ${res.status} ${(await res.text()).slice(0, 200)}`,
+    )
   }
   return res.status === 204 ? null : res.json()
 }
@@ -285,7 +303,9 @@ async function deployToGitHub(): Promise<void> {
     return
   }
   const gitBase = `/repos/${s.owner}/${s.repo}/git`
-  const btn = document.querySelector('#cms-banner .cms-deploy') as HTMLButtonElement | null
+  const btn = document.querySelector(
+    '#cms-banner .cms-deploy',
+  ) as HTMLButtonElement | null
   if (btn) {
     btn.disabled = true
     btn.textContent = 'Deploying…'
@@ -300,11 +320,13 @@ async function deployToGitHub(): Promise<void> {
     const message = `${s.commitPrefix} v${version}`
 
     const files = await collectPublishFiles()
-    if (files.length === 0) throw new Error('publish/ is empty — click Publish first')
+    if (files.length === 0)
+      throw new Error('publish/ is empty — click Publish first')
     setStatus(`Deploying ${files.length} files to ${s.owner}/${s.repo}…`)
 
     // 1. Upload each file as a blob.
-    const tree: { path: string; mode: '100644'; type: 'blob'; sha: string }[] = []
+    const tree: { path: string; mode: '100644'; type: 'blob'; sha: string }[] =
+      []
     for (const f of files) {
       const blob = await gh(s.token, 'POST', `${gitBase}/blobs`, {
         content: f.base64,
@@ -332,9 +354,15 @@ async function deployToGitHub(): Promise<void> {
     })
     // 5. Point the branch at the new commit (create it if new).
     if (branchExists) {
-      await gh(s.token, 'PATCH', `${gitBase}/refs/heads/${s.branch}`, { sha: commit.sha, force: true })
+      await gh(s.token, 'PATCH', `${gitBase}/refs/heads/${s.branch}`, {
+        sha: commit.sha,
+        force: true,
+      })
     } else {
-      await gh(s.token, 'POST', `${gitBase}/refs`, { ref: `refs/heads/${s.branch}`, sha: commit.sha })
+      await gh(s.token, 'POST', `${gitBase}/refs`, {
+        ref: `refs/heads/${s.branch}`,
+        sha: commit.sha,
+      })
     }
     // 6. Best-effort: enable Pages on this branch (ignored if already enabled).
     try {
@@ -418,7 +446,11 @@ function modelRoutes(): { route: string; path: string }[] {
   return out
 }
 
-function buildNavHtml(sections: Section[], route: string, base: string): string {
+function buildNavHtml(
+  sections: Section[],
+  route: string,
+  base: string,
+): string {
   const items = sections
     .map(
       (s) =>
@@ -443,7 +475,8 @@ function buildPage(
   // marker (replaced with the sleeper script after serialization).
   const walker = doc.createNodeIterator(doc, NodeFilter.SHOW_COMMENT)
   const comments: Comment[] = []
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) comments.push(n as Comment)
+  for (let n = walker.nextNode(); n; n = walker.nextNode())
+    comments.push(n as Comment)
   comments.forEach((c) => {
     if (c.data.trim() !== 'cms:entry') c.remove()
   })
@@ -461,7 +494,10 @@ function buildPage(
   const base = opts.isHome ? '' : '../'
   // Turn hash routes (#/about-us) into relative static links everywhere.
   doc.querySelectorAll<HTMLAnchorElement>('a[href^="#/"]').forEach((a) => {
-    a.setAttribute('href', routeHref(a.getAttribute('href')!.slice(2).replace(/\/$/, ''), base))
+    a.setAttribute(
+      'href',
+      routeHref(a.getAttribute('href')!.slice(2).replace(/\/$/, ''), base),
+    )
   })
   // Rebase root-absolute asset paths (/css, /images) to be relative to the page.
   doc.querySelectorAll('[src],[href]').forEach((el) => {
@@ -476,6 +512,38 @@ function buildPage(
     /<!--\s*cms:entry\s*-->/g,
     `<script src="${base}cms.js"></script>`,
   )
+}
+
+// Remove every entry in a directory except the named ones.
+async function removeAllExcept(
+  dir: FileSystemDirectoryHandle,
+  keep: Set<string>,
+): Promise<void> {
+  const names: string[] = []
+  for await (const [name] of (dir as any).entries() as Entries) names.push(name)
+  for (const name of names)
+    if (!keep.has(name)) await dir.removeEntry(name, { recursive: true })
+}
+
+// Recursively copy every entry of srcDir into destDir.
+async function copyInto(
+  srcDir: FileSystemDirectoryHandle,
+  destDir: FileSystemDirectoryHandle,
+): Promise<void> {
+  for await (const [name, h] of (srcDir as any).entries() as Entries) {
+    if (h.kind === 'file') {
+      const buf = await (
+        await (h as FileSystemFileHandle).getFile()
+      ).arrayBuffer()
+      const fh = await destDir.getFileHandle(name, { create: true })
+      const w = await fh.createWritable()
+      await w.write(buf)
+      await w.close()
+    } else {
+      const sub = await destDir.getDirectoryHandle(name, { create: true })
+      await copyInto(h as FileSystemDirectoryHandle, sub)
+    }
+  }
 }
 
 async function publishSite(): Promise<void> {
@@ -501,6 +569,13 @@ async function publishSite(): Promise<void> {
     const template = await readFile('content/template.html')
     const sections = scanSections()
     const routes = modelRoutes()
+
+    // Clean rebuild: the whole site is regenerated from content/, so wipe
+    // publish/ first (keeping only version.json). No stale files can survive.
+    const publishDir = await resolveDir(['publish'], true)
+    await removeAllExcept(publishDir, new Set(['version.json']))
+
+    // 1. Generate one static HTML page per route from the single template.
     for (const { route, path } of routes) {
       const text = model.get(path)!
       const { body } = splitFrontmatter(text)
@@ -516,7 +591,17 @@ async function publishSite(): Promise<void> {
       })
       await writeFile(routeToOutPath(route), html)
     }
-    // Sync publish version to the (just-saved) content version.
+
+    // 2. Copy static assets (css/, images/, favicon, cms.js) from their source.
+    let assetNote = ''
+    try {
+      await copyInto(await resolveDir(['content', '_assets']), publishDir)
+    } catch {
+      assetNote =
+        ' (no content/_assets — run `npm run build` to produce cms.js and add css/images there)'
+    }
+
+    // 3. Sync publish version to the (just-saved) content version.
     let v = 0
     try {
       v = JSON.parse(await readFile(VERSION_PATH)).version ?? 0
@@ -532,7 +617,7 @@ async function publishSite(): Promise<void> {
       ) + '\n',
     )
     setStatus(
-      `Published ${routes.length} page(s) to publish/ (version ${v}). Deploy the publish/ folder to go live.`,
+      `Rebuilt publish/ from content/: ${routes.length} page(s), version ${v}.${assetNote}`,
     )
   } catch (err) {
     setStatus('Publish failed: ' + (err as Error).message)
@@ -1189,9 +1274,11 @@ function updateActiveNav(route: string): void {
 // Show `data-cms-home-only` elements (e.g. the hero) only on the homepage —
 // mirrors what buildPage() does for the published static pages.
 function applyHomeOnly(isHome: boolean): void {
-  document.querySelectorAll<HTMLElement>('[data-cms-home-only]').forEach((el) => {
-    el.style.display = isHome ? '' : 'none'
-  })
+  document
+    .querySelectorAll<HTMLElement>('[data-cms-home-only]')
+    .forEach((el) => {
+      el.style.display = isHome ? '' : 'none'
+    })
 }
 
 function renderRoute(): void {

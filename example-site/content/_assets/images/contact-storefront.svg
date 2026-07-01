@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 420" width="700" height="420">
+  <rect width="700" height="420" fill="#EAD2A6"/>
+  <rect y="330" width="700" height="90" fill="#C1663B"/>
+
+  <!-- map pin -->
+  <g transform="translate(350,190)">
+    <path d="M0 -110 C60 -110 100 -70 100 -20 C100 40 40 90 0 140 C-40 90 -100 40 -100 -20 C-100 -70 -60 -110 0 -110 Z" fill="#4A2E20"/>
+    <circle cx="0" cy="-20" r="46" fill="#F6E7CF"/>
+    <g transform="translate(0,-20)">
+      <path d="M-16 6 C-16 -4 -8 -10 0 -10 C8 -10 16 -4 16 6" fill="none" stroke="#C1663B" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="0" cy="10" r="16" fill="#D9A653"/>
+    </g>
+  </g>
+</svg>

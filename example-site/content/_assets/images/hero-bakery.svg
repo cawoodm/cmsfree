@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" width="900" height="500">
+  <rect width="900" height="500" fill="#F6E7CF"/>
+  <rect width="900" height="320" fill="#EAD2A6"/>
+  <rect x="0" y="300" width="900" height="200" fill="#C1663B"/>
+
+  <!-- storefront -->
+  <rect x="150" y="150" width="600" height="220" fill="#4A2E20" rx="6"/>
+  <rect x="175" y="175" width="550" height="140" fill="#F6E7CF" rx="4"/>
+  <rect x="380" y="315" width="140" height="55" fill="#4A2E20"/>
+  <rect x="393" y="325" width="114" height="45" fill="#8A5A2B" rx="2"/>
+
+  <!-- awning -->
+  <g>
+    <path d="M150 150 L750 150 L780 100 L120 100 Z" fill="#C1663B"/>
+    <path d="M120 100 L180 100 L165 150 L135 150 Z" fill="#F6E7CF"/>
+    <path d="M240 100 L300 100 L285 150 L255 150 Z" fill="#F6E7CF"/>
+    <path d="M360 100 L420 100 L405 150 L375 150 Z" fill="#F6E7CF"/>
+    <path d="M480 100 L540 100 L525 150 L495 150 Z" fill="#F6E7CF"/>
+    <path d="M600 100 L660 100 L645 150 L615 150 Z" fill="#F6E7CF"/>
+    <path d="M720 100 L780 100 L765 150 L735 150 Z" fill="#F6E7CF"/>
+  </g>
+
+  <!-- bread in window -->
+  <g transform="translate(230,230)">
+    <ellipse cx="0" cy="30" rx="34" ry="16" fill="#B5651D"/>
+    <path d="M-34 30 Q0 -6 34 30" fill="#D9A653"/>
+    <path d="M-20 18 Q0 8 20 18" fill="none" stroke="#8A5A2B" stroke-width="2"/>
+  </g>
+  <g transform="translate(320,235)">
+    <ellipse cx="0" cy="28" rx="28" ry="14" fill="#B5651D"/>
+    <path d="M-28 28 Q0 -2 28 28" fill="#E0B679"/>
+  </g>
+  <g transform="translate(600,232)">
+    <circle cx="0" cy="20" r="22" fill="#D9A653"/>
+    <circle cx="0" cy="20" r="22" fill="none" stroke="#8A5A2B" stroke-width="2"/>
+  </g>
+  <g transform="translate(650,238)">
+    <circle cx="0" cy="18" r="18" fill="#E0B679"/>
+  </g>
+
+  <!-- sun -->
+  <circle cx="820" cy="70" r="34" fill="#F3C969"/>
+</svg>

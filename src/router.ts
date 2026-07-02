@@ -4,6 +4,18 @@ import { currentRoute, routeToPath, routeFromAnchor } from './routes'
 import { contentEl, renderCurrent } from './view'
 import { setStatus } from './chrome'
 
+// A route reached via its real published URL (e.g. 'hidden', from /hidden/)
+// carries no trace of the '_' hidden-section convention (see routes.ts
+// publicSlug). Fall back to the '_'-prefixed section slug so those pages
+// still resolve when entering edit mode directly on them.
+function resolvePath(route: string): string {
+  const path = routeToPath(route)
+  if (model.has(path)) return path
+  const segs = route.split('/')
+  const hiddenPath = routeToPath(['_' + segs[0], ...segs.slice(1)].join('/'))
+  return model.has(hiddenPath) ? hiddenPath : path
+}
+
 function updateActiveNav(route: string): void {
   document.querySelectorAll<HTMLAnchorElement>('[x-cms-nav] a').forEach((a) => {
     const r = routeFromAnchor(a)
@@ -25,7 +37,7 @@ export function renderRoute(): void {
   if (!state.loaded) return
   const route = currentRoute()
   applyHomeOnly(route === '')
-  const path = routeToPath(route)
+  const path = resolvePath(route)
   const text = model.get(path)
   if (text === undefined) {
     const el = contentEl()

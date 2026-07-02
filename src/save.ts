@@ -4,7 +4,7 @@
 import { state, model, VERSION_PATH } from './state'
 import type { Entries } from './state'
 import { resolveDir, readFile, writeFile, verifyPermission } from './disk'
-import { scanSections } from './model'
+import { scanSections, isManagedSectionDir } from './model'
 import { setStatus, updateSaveButton } from './chrome'
 
 export function markDirty(): void {
@@ -24,11 +24,7 @@ async function pruneDisk(): Promise<void> {
     if (h.kind === 'file') {
       if (name.endsWith('.md') && !paths.has(`content/${name}`))
         await content.removeEntry(name)
-    } else if (
-      h.kind === 'directory' &&
-      !name.startsWith('_') &&
-      !name.startsWith('.')
-    ) {
+    } else if (h.kind === 'directory' && isManagedSectionDir(name)) {
       if (!slugs.has(name)) {
         await content.removeEntry(name, { recursive: true }) // whole section removed
       } else {

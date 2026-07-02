@@ -4,6 +4,16 @@ import type { Section, Entries } from './state'
 import { resolveDir } from './disk'
 import { parseFrontmatter, titleize } from './markdown'
 
+// A content/ directory that's part of the managed model. '_assets' holds
+// static files (css/images/cms.js) copied verbatim by Publish, never parsed
+// as content, so it's excluded. Dotfiles (.git, .DS_Store, …) are OS/tooling
+// noise. Everything else — including '_'-prefixed folders like '_hidden' — is
+// a real section: loaded, saved, and published, just left out of the nav (see
+// scanSections).
+export function isManagedSectionDir(name: string): boolean {
+  return name !== '_assets' && !name.startsWith('.')
+}
+
 // Load the entire content/ tree (one level of section folders) into the model.
 export async function loadModel(): Promise<void> {
   model.clear()
@@ -14,11 +24,7 @@ export async function loadModel(): Promise<void> {
         `content/${name}`,
         await (await (h as FileSystemFileHandle).getFile()).text(),
       )
-    } else if (
-      h.kind === 'directory' &&
-      !name.startsWith('_') &&
-      !name.startsWith('.')
-    ) {
+    } else if (h.kind === 'directory' && isManagedSectionDir(name)) {
       for await (const [fn, fh] of (h as any).entries() as Entries) {
         if (fh.kind === 'file' && fn.endsWith('.md')) {
           model.set(

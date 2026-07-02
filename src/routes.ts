@@ -11,19 +11,31 @@ export function routeToPath(route: string): string {
   return `content/${segs.join('/')}.md`
 }
 
+// A '_'-prefixed section slug (e.g. '_hidden') is published and reachable but
+// left out of the nav (see scanSections). Its public URL drops the underscore
+// — content/_hidden/ is served at /hidden/ — so hidden-ness is purely an
+// authoring convention, invisible to visitors.
+function publicSlug(seg: string): string {
+  return seg.startsWith('_') ? seg.slice(1) : seg
+}
+
 // Published URL for a route (real static links, not hash routes). Root-absolute;
 // used for edit-mode/dev navigation (exitEditMode), which runs at the site root.
 export function routeToUrl(route: string): string {
   if (route === '') return '/'
   const segs = route.split('/')
-  return segs.length === 1 ? `/${segs[0]}/` : `/${segs[0]}/${segs[1]}.html`
+  return segs.length === 1
+    ? `/${publicSlug(segs[0])}/`
+    : `/${publicSlug(segs[0])}/${segs[1]}.html`
 }
 
 // A route's page path RELATIVE to the publish/ root (no leading slash).
 export function routeToRelTarget(route: string): string {
   if (route === '') return ''
   const segs = route.split('/')
-  return segs.length === 1 ? `${segs[0]}/` : `${segs[0]}/${segs[1]}.html`
+  return segs.length === 1
+    ? `${publicSlug(segs[0])}/`
+    : `${publicSlug(segs[0])}/${segs[1]}.html`
 }
 
 // A route's href from a page whose depth prefix is `base` ('' for home, '../'
@@ -38,8 +50,8 @@ export function routeToOutPath(route: string): string {
   if (route === '') return 'publish/index.html'
   const segs = route.split('/')
   return segs.length === 1
-    ? `publish/${segs[0]}/index.html`
-    : `publish/${segs[0]}/${segs[1]}.html`
+    ? `publish/${publicSlug(segs[0])}/index.html`
+    : `publish/${publicSlug(segs[0])}/${segs[1]}.html`
 }
 
 export function routeFromAnchor(a: HTMLAnchorElement): string | null {

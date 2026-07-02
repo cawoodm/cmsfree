@@ -117,7 +117,9 @@ export async function publishSite(): Promise<void> {
       const { body } = splitFrontmatter(text)
       const title =
         parseFrontmatter(text).title ||
-        (route === '' ? 'Home' : titleize(route.split('/').pop()!))
+        (route === ''
+          ? 'Home'
+          : titleize(route.split('/').pop()!.replace(/^_/, '')))
       const base = route === '' ? '' : '../'
       const html = buildPage(template, {
         title,

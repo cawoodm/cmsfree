@@ -6,9 +6,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "node scripts/serve-static.mjs example-site/publish 4173",
+    "publish:content": "node scripts/publish-content.mjs example-site",
     "publish": "pwsh -NoProfile -File ./publish.ps1"
   },
   "devDependencies": {
+    "linkedom": "^0.18.12",
     "vite": "^6.0.0"
   },
   "dependencies": {

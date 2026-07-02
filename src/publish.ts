@@ -82,6 +82,34 @@ function buildPage(
   )
 }
 
+// Render every route's static HTML page from the template + model. Pure aside
+// from needing DOMParser/NodeFilter in scope — native in browsers; the CLI
+// build script (scripts/publish-content.mjs) polyfills both via linkedom
+// before this module is loaded. Shared by publishSite() below and the CLI
+// script, so the two never drift apart.
+export function renderPages(
+  template: string,
+  sections: Section[],
+  routes: { route: string; path: string }[],
+  model: Map<string, string>,
+): { outPath: string; html: string }[] {
+  return routes.map(({ route, path }) => {
+    const text = model.get(path)!
+    const { body } = splitFrontmatter(text)
+    const title =
+      parseFrontmatter(text).title ||
+      (route === '' ? 'Home' : titleize(route.split('/').pop()!.replace(/^_/, '')))
+    const base = route === '' ? '' : '../'
+    const html = buildPage(template, {
+      title,
+      navHtml: buildNavHtml(sections, route.includes('/') ? '' : route, base),
+      contentHtml: renderBody(body, slugOfPath(path), path),
+      isHome: route === '',
+    })
+    return { outPath: routeToOutPath(route), html }
+  })
+}
+
 export async function publishSite(): Promise<void> {
   if (!state.dirHandle) return void setStatus('Connect a folder first.')
   if (state.dirty) {
@@ -112,23 +140,8 @@ export async function publishSite(): Promise<void> {
     await removeAllExcept(publishDir, new Set(['version.json']))
 
     // 1. Generate one static HTML page per route from the single template.
-    for (const { route, path } of routes) {
-      const text = model.get(path)!
-      const { body } = splitFrontmatter(text)
-      const title =
-        parseFrontmatter(text).title ||
-        (route === ''
-          ? 'Home'
-          : titleize(route.split('/').pop()!.replace(/^_/, '')))
-      const base = route === '' ? '' : '../'
-      const html = buildPage(template, {
-        title,
-        navHtml: buildNavHtml(sections, route.includes('/') ? '' : route, base),
-        contentHtml: renderBody(body, slugOfPath(path), path),
-        isHome: route === '',
-      })
-      await writeFile(routeToOutPath(route), html)
-    }
+    for (const { outPath, html } of renderPages(template, sections, routes, model))
+      await writeFile(outPath, html)
 
     // 2. Copy static assets (css/, images/, favicon, cms.js) from their source.
     let assetNote = ''

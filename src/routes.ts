@@ -69,6 +69,13 @@ export function routeFromAnchor(a: HTMLAnchorElement): string | null {
   return null
 }
 
+// A page's slug when its frontmatter doesn't set one explicitly — the public,
+// underscore-free identity used in `page.slug` template expressions (e.g.
+// `data-cms-show="page.slug !== 'home'"`).
+export function defaultSlug(route: string): string {
+  return route === '' ? 'home' : publicSlug(route.split('/').pop()!)
+}
+
 export function currentRoute(): string {
   const hash = location.hash.replace(/^#\/?/, '').replace(/\/$/, '')
   if (hash) return hash

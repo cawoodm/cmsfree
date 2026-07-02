@@ -12,13 +12,16 @@ export function splitFrontmatter(text: string): {
 export function parseFrontmatter(text: string): {
   title?: string
   order?: number
+  slug?: string
 } {
   const { frontmatter } = splitFrontmatter(text)
-  const out: { title?: string; order?: number } = {}
+  const out: { title?: string; order?: number; slug?: string } = {}
   const t = /^title:\s*(.+)$/m.exec(frontmatter)
   if (t) out.title = t[1].trim().replace(/^["']|["']$/g, '')
   const o = /^order:\s*(\d+)$/m.exec(frontmatter)
   if (o) out.order = Number(o[1])
+  const s = /^slug:\s*(.+)$/m.exec(frontmatter)
+  if (s) out.slug = s[1].trim().replace(/^["']|["']$/g, '')
   return out
 }
 
@@ -44,6 +47,19 @@ export function slugify(s: string): string {
 
 export function titleize(slug: string): string {
   return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// Evaluate a template `data-cms-show` expression (e.g. "page.slug !== 'home'")
+// against the current page. The expression is template-authored, not user
+// input, so a syntax/runtime error is a template bug — default to visible
+// rather than silently hiding content.
+export function evalShowExpr(expr: string, page: { slug: string }): boolean {
+  try {
+    return Boolean(new Function('page', `return (${expr});`)(page))
+  } catch (err) {
+    console.warn(`data-cms-show: invalid expression "${expr}"`, err)
+    return true
+  }
 }
 
 export function escapeHtml(s: string): string {

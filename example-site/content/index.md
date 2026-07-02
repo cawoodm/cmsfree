@@ -1,5 +1,6 @@
 ---
 title: Home
+slug: home
 ---
 
 # Welcome to Hearth & Wheat Bakery

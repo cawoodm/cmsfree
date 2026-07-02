@@ -1,5 +1,6 @@
 ---
 title: Our History
+slug: history
 order: 2
 ---
 

@@ -20,7 +20,7 @@ export function createSection(): void {
   const order = scanSections().length + 1
   model.set(
     `content/${slug}/index.md`,
-    `---\ntitle: ${name}\norder: ${order}\n---\n\n# ${name}\n\nNew section — edit me.\n`,
+    `---\ntitle: ${name}\nslug: ${slug}\norder: ${order}\n---\n\n# ${name}\n\nNew section — edit me.\n`,
   )
   markDirty()
   renderNav()
@@ -91,7 +91,7 @@ export function createBlock(): void {
     return void setStatus(`A block "${slug}" already exists in this section.`)
   model.set(
     path,
-    `---\ntitle: ${name}\n---\n\n# ${name}\n\nNew block. Link to it from content with \`[${name}](#/${section}/${slug})\`.\n`,
+    `---\ntitle: ${name}\nslug: ${slug}\n---\n\n# ${name}\n\nNew block. Link to it from content with \`[${name}](#/${section}/${slug})\`.\n`,
   )
   markDirty()
   location.hash = `#/${section}/${slug}`

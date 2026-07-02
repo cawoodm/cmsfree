@@ -1,3 +1,8 @@
+---
+title: Markdown syntax guide
+slug: hidden
+---
+
 # Markdown syntax guide
 
 [here](?edit)

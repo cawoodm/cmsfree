@@ -1,6 +1,7 @@
 // Runtime router (EDIT MODE ONLY) — in-memory hash routing over the model.
 import { state, model } from './state'
-import { currentRoute, routeToPath, routeFromAnchor } from './routes'
+import { currentRoute, routeToPath, routeFromAnchor, defaultSlug } from './routes'
+import { parseFrontmatter, evalShowExpr } from './markdown'
 import { contentEl, renderCurrent } from './view'
 import { setStatus } from './chrome'
 
@@ -23,22 +24,21 @@ function updateActiveNav(route: string): void {
   })
 }
 
-// Show `data-cms-home-only` elements (e.g. the hero) only on the homepage —
+// Toggle `data-cms-show` elements (e.g. the hero) for the current page —
 // mirrors what buildPage() does for the published static pages.
-function applyHomeOnly(isHome: boolean): void {
-  document
-    .querySelectorAll<HTMLElement>('[data-cms-home-only]')
-    .forEach((el) => {
-      el.style.display = isHome ? '' : 'none'
-    })
+function applyPageShow(page: { slug: string }): void {
+  document.querySelectorAll<HTMLElement>('[data-cms-show]').forEach((el) => {
+    const show = evalShowExpr(el.getAttribute('data-cms-show')!, page)
+    el.style.display = show ? '' : 'none'
+  })
 }
 
 export function renderRoute(): void {
   if (!state.loaded) return
   const route = currentRoute()
-  applyHomeOnly(route === '')
   const path = resolvePath(route)
   const text = model.get(path)
+  applyPageShow({ slug: (text && parseFrontmatter(text).slug) || defaultSlug(route) })
   if (text === undefined) {
     const el = contentEl()
     if (el)

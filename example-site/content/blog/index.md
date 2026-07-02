@@ -1,5 +1,6 @@
 ---
 title: Blog
+slug: blog
 order: 5
 ---
 

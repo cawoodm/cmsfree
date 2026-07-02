@@ -17,7 +17,8 @@
   renders into (edit mode). The CMS fills the two placeholders:
     <nav x-cms-nav>       → the section nav (generated)
     <main x-cms-content>  → the page's rendered markdown
-  Elements marked data-cms-home-only appear on the homepage only.
+  Elements can be conditionally shown with data-cms-show="<expression>", a JS
+  expression evaluated against the current page (e.g. `page.slug`).
   <title> is set per page at publish time.
 -->
 
@@ -26,7 +27,7 @@
   <nav class="site-nav" x-cms-nav></nav>
 </header>
 
-<div class="hero" data-cms-home-only>
+<div class="hero" data-cms-show="page.slug !== 'home'">
   <img src="/images/hero-bakery.svg" alt="Hearth & Wheat Bakery storefront">
   <div class="hero-text">
     <h1>Welcome to Hearth &amp; Wheat Bakery</h1>

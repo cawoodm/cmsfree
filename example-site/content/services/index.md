@@ -1,5 +1,6 @@
 ---
 title: Services
+slug: services
 order: 3
 ---
 

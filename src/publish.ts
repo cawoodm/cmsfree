@@ -12,8 +12,14 @@ import {
   copyInto,
 } from './disk'
 import { scanSections, modelRoutes, slugOfPath } from './model'
-import { splitFrontmatter, parseFrontmatter, titleize, escapeHtml } from './markdown'
-import { routeHref, routeToOutPath } from './routes'
+import {
+  splitFrontmatter,
+  parseFrontmatter,
+  titleize,
+  escapeHtml,
+  evalShowExpr,
+} from './markdown'
+import { routeHref, routeToOutPath, defaultSlug } from './routes'
 import { renderBody } from './content'
 import { setStatus } from './chrome'
 import { saveAll } from './save'
@@ -36,6 +42,7 @@ function buildPage(
     navHtml: string
     contentHtml: string
     isHome: boolean
+    page: { slug: string }
   },
 ): string {
   const doc = new DOMParser().parseFromString(template, 'text/html')
@@ -54,8 +61,11 @@ function buildPage(
   if (navHost) navHost.innerHTML = opts.navHtml
   const contentHost = doc.querySelector('[x-cms-content]')
   if (contentHost) contentHost.innerHTML = opts.contentHtml
-  if (!opts.isHome)
-    doc.querySelectorAll('[data-cms-home-only]').forEach((el) => el.remove())
+  // Conditionally-shown elements (e.g. the hero): drop any whose expression
+  // evaluates false for this page — static output needs no client-side JS.
+  doc.querySelectorAll<HTMLElement>('[data-cms-show]').forEach((el) => {
+    if (!evalShowExpr(el.getAttribute('data-cms-show')!, opts.page)) el.remove()
+  })
   // All output paths are RELATIVE to this page, so the site is portable to any
   // subpath (GitHub project pages), the domain root, or file://. Every page is
   // either home (depth 0) or a section/block (depth 1), hence base '' or '../'.
@@ -96,15 +106,16 @@ export function renderPages(
   return routes.map(({ route, path }) => {
     const text = model.get(path)!
     const { body } = splitFrontmatter(text)
-    const title =
-      parseFrontmatter(text).title ||
-      (route === '' ? 'Home' : titleize(route.split('/').pop()!.replace(/^_/, '')))
+    const fm = parseFrontmatter(text)
+    const title = fm.title || titleize(defaultSlug(route))
+    const page = { slug: fm.slug || defaultSlug(route) }
     const base = route === '' ? '' : '../'
     const html = buildPage(template, {
       title,
       navHtml: buildNavHtml(sections, route.includes('/') ? '' : route, base),
       contentHtml: renderBody(body, slugOfPath(path), path),
       isHome: route === '',
+      page,
     })
     return { outPath: routeToOutPath(route), html }
   })
@@ -127,12 +138,21 @@ export async function publishSite(): Promise<void> {
   ) as HTMLButtonElement | null
   if (btn) {
     btn.disabled = true
-    btn.textContent = 'Publishing…'
+    btn.textContent = 'Publishing… 0%'
   }
   try {
     const template = await readFile('content/template.html')
     const sections = scanSections()
     const routes = modelRoutes()
+
+    // Progress is measured across one unit per page plus a final unit for the
+    // asset copy; the button shows the running percentage as each unit lands.
+    const totalSteps = routes.length + 1
+    let step = 0
+    const showProgress = (): void => {
+      if (btn)
+        btn.textContent = `Publishing… ${Math.round((step / totalSteps) * 100)}%`
+    }
 
     // Clean rebuild: the whole site is regenerated from content/, so wipe
     // publish/ first (keeping only version.json). No stale files can survive.
@@ -140,8 +160,16 @@ export async function publishSite(): Promise<void> {
     await removeAllExcept(publishDir, new Set(['version.json']))
 
     // 1. Generate one static HTML page per route from the single template.
-    for (const { outPath, html } of renderPages(template, sections, routes, model))
+    for (const { outPath, html } of renderPages(
+      template,
+      sections,
+      routes,
+      model,
+    )) {
       await writeFile(outPath, html)
+      step++
+      showProgress()
+    }
 
     // 2. Copy static assets (css/, images/, favicon, cms.js) from their source.
     let assetNote = ''
@@ -151,6 +179,8 @@ export async function publishSite(): Promise<void> {
       assetNote =
         ' (no content/_assets — run `npm run build` to produce cms.js and add css/images there)'
     }
+    step++
+    showProgress()
 
     // 3. Sync publish version to the (just-saved) content version.
     let v = 0

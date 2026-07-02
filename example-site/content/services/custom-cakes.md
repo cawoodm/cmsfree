@@ -1,5 +1,6 @@
 ---
 title: Custom Cakes
+slug: custom-cakes
 ---
 
 # Custom Cakes

@@ -56,7 +56,10 @@ export function scanSections(): Section[] {
   return out
 }
 
-// Every publishable route derived from the model.
+// Every publishable route derived from the model. A '_'-prefixed FILENAME
+// (e.g. content/services/_pricing.md) is a fragment — content meant to be
+// concatenated into another page via [include](_pricing.md), not a page in
+// its own right — so it's excluded here, same as index.md itself.
 export function modelRoutes(): { route: string; path: string }[] {
   const out: { route: string; path: string }[] = []
   for (const path of model.keys()) {
@@ -66,7 +69,8 @@ export function modelRoutes(): { route: string; path: string }[] {
       out.push({ route: m[1], path })
     else if (
       (m = /^content\/([^/]+)\/([^/]+)\.md$/.exec(path)) &&
-      m[2] !== 'index'
+      m[2] !== 'index' &&
+      !m[2].startsWith('_')
     )
       out.push({ route: `${m[1]}/${m[2]}`, path })
   }

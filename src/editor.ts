@@ -5,7 +5,7 @@ import { currentRoute } from './routes'
 import { markDirty } from './save'
 import { setStatus } from './chrome'
 import { contentEl, navControl, renderNav, renderCurrent } from './view'
-import { createBlock, renameBlock, deleteBlock } from './crud'
+import { createBlock, createFragment, renameBlock, deleteBlock } from './crud'
 
 export function addEditAffordance(): void {
   const el = contentEl()
@@ -24,8 +24,16 @@ export function addEditAffordance(): void {
   const section = currentSectionSlug() || currentRoute()
   if (section)
     bar.append(
-      navControl('＋ block', 'Add a block to this section', () =>
+      navControl('＋ page', 'Add an unlisted page to this section', () =>
         createBlock(),
+      ),
+    )
+  if (currentSectionSlug())
+    bar.append(
+      navControl(
+        '＋ fragment',
+        'Add a fragment: content appended to this page, with no page of its own',
+        () => createFragment(),
       ),
     )
   if (currentIsBlock()) {

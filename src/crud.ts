@@ -6,7 +6,7 @@ import { scanSections, currentSectionSlug } from './model'
 import { currentRoute } from './routes'
 import { markDirty } from './save'
 import { setStatus } from './chrome'
-import { renderNav } from './view'
+import { renderNav, renderCurrent } from './view'
 import { renderRoute } from './router'
 
 export function createSection(): void {
@@ -78,6 +78,9 @@ export function deleteSection(s: Section): void {
   setStatus(`Deleted section "${s.title}" (unsaved).`)
 }
 
+// A "block" here is an unlisted PAGE (its own route/file, just out of the
+// nav) — for content concatenated into an existing page with no page of its
+// own, see createFragment() below.
 export function createBlock(): void {
   const section = currentSectionSlug() || currentRoute()
   if (!section)
@@ -97,6 +100,41 @@ export function createBlock(): void {
   location.hash = `#/${section}/${slug}`
   setStatus(
     `Added block "${name}" (unsaved). It's unlisted — link to it from a page.`,
+  )
+}
+
+// Add a fragment: content concatenated into the CURRENT page via
+// [include](_slug.md), with no page/route of its own — unlike createBlock()
+// above, which creates an unlisted PAGE. Fragments are sibling files in the
+// current page's section folder, named with a leading underscore so
+// modelRoutes() skips them (see model.ts).
+export function createFragment(): void {
+  const section = currentSectionSlug()
+  if (!section)
+    return void setStatus(
+      'Fragments need a section folder — open a section page first.',
+    )
+  const name = prompt('New fragment name (content added to this page):')
+  if (!name) return
+  const slug = slugify(name)
+  if (!slug) return void setStatus('That name has no usable slug.')
+  const fileName = `_${slug}.md`
+  const path = `content/${section}/${fileName}`
+  if (model.has(path))
+    return void setStatus(`A fragment "${slug}" already exists in this section.`)
+  model.set(
+    path,
+    `---\ntitle: ${name}\n---\n\n# ${name}\n\nNew fragment — edit me.\n`,
+  )
+  const directive = `[include](${fileName})`
+  const sep = state.currentText.endsWith('\n') ? '\n' : '\n\n'
+  const newText = state.currentText + sep + directive + '\n'
+  model.set(state.currentPath, newText)
+  state.currentText = newText
+  markDirty()
+  renderCurrent()
+  setStatus(
+    `Added fragment "${name}" to this page (unsaved). Click Save to write it to disk.`,
   )
 }
 

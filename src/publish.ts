@@ -10,6 +10,7 @@ import {
   verifyPermission,
   removeAllExcept,
   copyInto,
+  inBatches,
 } from './disk'
 import { scanSections, modelRoutes, slugOfPath } from './model'
 import {
@@ -61,10 +62,14 @@ function buildPage(
   if (navHost) navHost.innerHTML = opts.navHtml
   const contentHost = doc.querySelector('[x-cms-content]')
   if (contentHost) contentHost.innerHTML = opts.contentHtml
-  // Conditionally-shown elements (e.g. the hero): drop any whose expression
-  // evaluates false for this page — static output needs no client-side JS.
+  // Conditionally-shown elements (e.g. the hero): resolved at publish time, so
+  // static output needs no client-side JS and no trace of the expression —
+  // drop elements whose expression is false, and strip the attribute off the
+  // ones that stay.
   doc.querySelectorAll<HTMLElement>('[data-cms-show]').forEach((el) => {
-    if (!evalShowExpr(el.getAttribute('data-cms-show')!, opts.page)) el.remove()
+    if (evalShowExpr(el.getAttribute('data-cms-show')!, opts.page))
+      el.removeAttribute('data-cms-show')
+    else el.remove()
   })
   // All output paths are RELATIVE to this page, so the site is portable to any
   // subpath (GitHub project pages), the domain root, or file://. Every page is
@@ -159,17 +164,14 @@ export async function publishSite(): Promise<void> {
     const publishDir = await resolveDir(['publish'], true)
     await removeAllExcept(publishDir, new Set(['version.json']))
 
-    // 1. Generate one static HTML page per route from the single template.
-    for (const { outPath, html } of renderPages(
-      template,
-      sections,
-      routes,
-      model,
-    )) {
+    // 1. Generate one static HTML page per route, then write them to disk 8 at
+    // a time (independent files → safe to run concurrently) for speed.
+    const pages = renderPages(template, sections, routes, model)
+    await inBatches(pages, 8, async ({ outPath, html }) => {
       await writeFile(outPath, html)
       step++
       showProgress()
-    }
+    })
 
     // 2. Copy static assets (css/, images/, favicon, cms.js) from their source.
     let assetNote = ''

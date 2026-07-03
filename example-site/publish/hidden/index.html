@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Something Happened</title>
+<title>Markdown syntax guide</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/style.css">
@@ -27,8 +27,52 @@
   </div>
 </div>
 
-<main x-cms-content=""><h2>Something Happened</h2>
-<p>Blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah blah.</p>
+<main x-cms-content=""><h1>Markdown syntax guide</h1>
+<p><a href="?edit">here</a></p>
+<h2>Images</h2>
+<p><img src="../image/Markdown-mark.svg" alt="This is an alt text." title="This is a sample image."></p>
+<h2>Links</h2>
+<p>You may be using <a href="https://markdownlivepreview.com/">Markdown Live Preview</a>.</p>
+<h2>Blockquotes</h2>
+<blockquote>
+<p>Markdown is a lightweight markup language with plain-text-formatting syntax, created in 2004 by John Gruber with Aaron Swartz.</p>
+<blockquote>
+<p>Markdown is often used to format readme files, for writing messages in online discussion forums, and to create rich text using a plain text editor.</p>
+</blockquote>
+</blockquote>
+<h2>Tables</h2>
+<table>
+<thead>
+<tr>
+<th>Left columns</th>
+<th align="center">Right columns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>left foo</td>
+<td align="center">right foo</td>
+</tr>
+<tr>
+<td>left bar</td>
+<td align="center">right bar</td>
+</tr>
+<tr>
+<td>left baz</td>
+<td align="center">right baz</td>
+</tr>
+</tbody></table>
+<h2>Blocks of code</h2>
+<pre><code>let message = 'Hello world';
+alert(message);
+</code></pre>
+<h2>Mermaid diagrams</h2>
+<pre><code class="language-mermaid">graph TD
+  A[Start] --&gt; B{Decision}
+  B --&gt;|Yes| C[Finish]
+  B --&gt;|No| D[Alternate]
+</code></pre>
+<h2>Inline code</h2>
+<p>This web site is using <code>markedjs/marked</code>.</p>
 </main>
 
 <footer class="site-footer">

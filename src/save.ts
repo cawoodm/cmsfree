@@ -3,7 +3,13 @@
 // content/version.json exactly once.
 import { state, model, VERSION_PATH } from './state'
 import type { Entries } from './state'
-import { resolveDir, readFile, writeFile, verifyPermission } from './disk'
+import {
+  resolveDir,
+  readFile,
+  writeFile,
+  verifyPermission,
+  inBatches,
+} from './disk'
 import { scanSections, isManagedSectionDir } from './model'
 import { setStatus, updateSaveButton } from './chrome'
 
@@ -73,7 +79,9 @@ export async function saveAll(): Promise<void> {
     save.textContent = 'Saving…'
   }
   try {
-    for (const [path, text] of model) await writeFile(path, text)
+    // Independent files → write them 8 at a time for speed. The manifest/prune/
+    // version steps below run only after every model file has landed.
+    await inBatches([...model], 8, ([path, text]) => writeFile(path, text))
     await writeFile(
       'content/manifest.json',
       JSON.stringify(scanSections(), null, 2) + '\n',

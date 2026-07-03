@@ -1,21 +1,24 @@
-// GitHub Pages deploy — push the publish/ tree to a branch via the Git Data
-// API. Settings (token, owner, repo, branch, commit prefix) persist to
-// localStorage and are edited via a dialog. Commit message = prefix + version.
-import { GH_KEY } from './state'
-import type { Entries } from './state'
-import { resolveDir, readFile } from './disk'
+// GitHub Pages deploy — push the publish/ tree (and the editable content/
+// source, so another machine can pull the whole project back — see sync.ts) to
+// a branch via the Git Data API. Settings (token, owner, repo, branch, publish
+// subdir, content folder, commit prefix) persist to localStorage and are edited
+// via a dialog. Commit message = prefix + version.
 import { setStatus } from './chrome'
+import { readFile, resolveDir } from './disk'
+import type { Entries } from './state'
+import { GH_KEY } from './state'
 
-interface GhSettings {
+export interface GhSettings {
   token: string
   owner: string
   repo: string
   branch: string
   subdir: string
+  contentSubdir: string
   commitPrefix: string
 }
 
-function loadGhSettings(): GhSettings {
+export function loadGhSettings(): GhSettings {
   let s: Partial<GhSettings> = {}
   try {
     s = JSON.parse(localStorage.getItem(GH_KEY) || '{}')
@@ -28,6 +31,7 @@ function loadGhSettings(): GhSettings {
     repo: s.repo || '',
     branch: s.branch || 'main',
     subdir: s.subdir || '',
+    contentSubdir: s.contentSubdir || '_content',
     commitPrefix: s.commitPrefix || 'Publish site',
   }
 }
@@ -43,17 +47,20 @@ export function openSettingsDialog(note?: string): void {
     dlg.id = 'cms-settings'
     dlg.innerHTML = `
       <form method="dialog" class="cms-settings-form">
-        <h2>Deploy to GitHub Pages</h2>
+        <h2>GitHub deploy &amp; sync</h2>
         <p class="cms-settings-note"></p>
         <label>Personal access token
-          <span>repo scope — stored in this browser's localStorage</span>
+          <span>repo scope — stored in this browser's localStorage. Optional for pulling a public repo.</span>
           <input name="token" type="password" autocomplete="off" placeholder="ghp_…"></label>
         <label>Owner <span>user or org</span><input name="owner" placeholder="octocat"></label>
         <label>Repository<input name="repo" placeholder="my-site"></label>
         <label>Branch<input name="branch" placeholder="main"></label>
         <label>Subdirectory
-          <span>optional — deploy into this folder of the branch instead of its root; other paths on the branch are left untouched</span>
+          <span>optional — deploy publish/ into this folder of the branch instead of its root; other paths on the branch are left untouched</span>
           <input name="subdir" placeholder="e.g. my-site"></label>
+        <label>Content folder
+          <span>folder on the branch where the editable content/ source is stored (for sync to a new machine)</span>
+          <input name="contentSubdir" placeholder="_content"></label>
         <label>Commit message prefix<input name="commitPrefix" placeholder="Publish site"></label>
         <div class="cms-settings-actions">
           <button value="cancel" class="cms-btn cms-btn-cancel" type="submit">Cancel</button>
@@ -74,6 +81,10 @@ export function openSettingsDialog(note?: string): void {
         subdir: String(fd.get('subdir') || '')
           .trim()
           .replace(/^\/+|\/+$/g, ''),
+        contentSubdir:
+          String(fd.get('contentSubdir') || '')
+            .trim()
+            .replace(/^\/+|\/+$/g, '') || '_content',
         commitPrefix:
           String(fd.get('commitPrefix') || '').trim() || 'Publish site',
       })
@@ -87,6 +98,8 @@ export function openSettingsDialog(note?: string): void {
   ;(form.elements.namedItem('repo') as HTMLInputElement).value = s.repo
   ;(form.elements.namedItem('branch') as HTMLInputElement).value = s.branch
   ;(form.elements.namedItem('subdir') as HTMLInputElement).value = s.subdir
+  ;(form.elements.namedItem('contentSubdir') as HTMLInputElement).value =
+    s.contentSubdir
   ;(form.elements.namedItem('commitPrefix') as HTMLInputElement).value =
     s.commitPrefix
   ;(dlg.querySelector('.cms-settings-note') as HTMLElement).textContent =
@@ -105,10 +118,11 @@ function toBase64(buf: ArrayBuffer): string {
   return btoa(binary)
 }
 
-// Recursively read every file under publish/ as {path, base64}.
-async function collectPublishFiles(): Promise<
-  { path: string; base64: string }[]
-> {
+// Recursively read every file under a site-root subtree as {path, base64},
+// with paths relative to that subtree. Used for both publish/ and content/.
+export async function collectDir(
+  parts: string[],
+): Promise<{ path: string; base64: string }[]> {
   const out: { path: string; base64: string }[] = []
   async function walk(
     dir: FileSystemDirectoryHandle,
@@ -126,12 +140,14 @@ async function collectPublishFiles(): Promise<
       }
     }
   }
-  await walk(await resolveDir(['publish']), '')
+  await walk(await resolveDir(parts), '')
   return out
 }
 
-// Thin GitHub REST helper. Throws with the response body on failure.
-async function gh(
+// Thin GitHub REST helper. Throws with the response body on failure. The token
+// is optional: with an empty token the Authorization header is omitted, so
+// read-only calls against a PUBLIC repo work (used to bootstrap a new machine).
+export async function gh(
   token: string,
   method: string,
   path: string,
@@ -140,7 +156,7 @@ async function gh(
   const res = await fetch(`https://api.github.com${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
@@ -162,7 +178,8 @@ export async function deployToGitHub(): Promise<void> {
     return
   }
   const gitBase = `/repos/${s.owner}/${s.repo}/git`
-  const prefix = s.subdir ? `${s.subdir}/` : ''
+  const pubPrefix = s.subdir ? `${s.subdir}/` : ''
+  const conPrefix = `${s.contentSubdir}/`
   const btn = document.querySelector(
     '#cms-banner .cms-deploy',
   ) as HTMLButtonElement | null
@@ -179,25 +196,36 @@ export async function deployToGitHub(): Promise<void> {
     }
     const message = `${s.commitPrefix} v${version}`
 
-    const files = await collectPublishFiles()
-    if (files.length === 0)
+    // Deploy pushes BOTH the published site and its editable source, so a fresh
+    // machine can pull the whole project back (see sync.ts). publish/ goes to
+    // the (optional) subdirectory; content/ goes to the content folder.
+    const pubFiles = await collectDir(['publish'])
+    if (pubFiles.length === 0)
       throw new Error('publish/ is empty — click Publish first')
-    setStatus(`Deploying ${files.length} files to ${s.owner}/${s.repo}…`)
+    const conFiles = await collectDir(['content'])
+    const total = pubFiles.length + conFiles.length
+    setStatus(`Deploying ${total} files to ${s.owner}/${s.repo}…`)
 
-    // 1. Upload each file as a blob.
+    // 1. Upload each file as a blob (publish under pubPrefix, content under
+    // conPrefix).
     const tree: { path: string; mode: '100644'; type: 'blob'; sha: string }[] =
       []
-    for (const f of files) {
-      const blob = await gh(s.token, 'POST', `${gitBase}/blobs`, {
-        content: f.base64,
-        encoding: 'base64',
-      })
-      tree.push({
-        path: prefix + f.path,
-        mode: '100644',
-        type: 'blob',
-        sha: blob.sha,
-      })
+    for (const [files, prefix] of [
+      [pubFiles, pubPrefix],
+      [conFiles, conPrefix],
+    ] as const) {
+      for (const f of files) {
+        const blob = await gh(s.token, 'POST', `${gitBase}/blobs`, {
+          content: f.base64,
+          encoding: 'base64',
+        })
+        tree.push({
+          path: prefix + f.path,
+          mode: '100644',
+          type: 'blob',
+          sha: blob.sha,
+        })
+      }
     }
     // 2. Find the branch head, if the branch already exists.
     let parents: string[] = []
@@ -209,13 +237,15 @@ export async function deployToGitHub(): Promise<void> {
     } catch {
       /* branch doesn't exist yet → first (root) commit */
     }
-    // 3. Build the full tree. With no subdirectory, replace the whole branch
-    // (matches every prior version of this feature). With a subdirectory, keep
-    // every path outside it as-is — other projects can share the same branch —
-    // and only replace what's under the subdirectory (which also prunes files
-    // removed from this site, since none of its old paths are carried over).
+    // 3. Build the full tree. With no publish subdirectory, publish owns the
+    // branch root, so replace the whole tree (matches every prior version of
+    // this feature) — the fresh content blobs under conPrefix are simply part of
+    // that new tree. With a publish subdirectory, keep every path outside BOTH
+    // the publish and content folders as-is — other projects can share the
+    // branch — and only replace what's under them (which also prunes files
+    // removed from this site, since none of the old paths are carried over).
     let entries = tree
-    if (prefix && branchExists) {
+    if (pubPrefix && branchExists) {
       const headCommit = await gh(
         s.token,
         'GET',
@@ -233,7 +263,12 @@ export async function deployToGitHub(): Promise<void> {
           type: string
           sha: string
         }[]
-      ).filter((e) => e.type === 'blob' && !e.path.startsWith(prefix))
+      ).filter(
+        (e) =>
+          e.type === 'blob' &&
+          !e.path.startsWith(pubPrefix) &&
+          !e.path.startsWith(conPrefix),
+      )
       entries = [...outside, ...tree]
     }
     const newTree = await gh(s.token, 'POST', `${gitBase}/trees`, {
@@ -266,7 +301,7 @@ export async function deployToGitHub(): Promise<void> {
       /* already enabled or insufficient scope — not fatal */
     }
     setStatus(
-      `Deployed "${message}" to ${s.owner}/${s.repo}@${s.branch}${prefix ? '/' + s.subdir : ''}. Live at https://${s.owner}.github.io/${s.repo}/${prefix}`,
+      `Deployed "${message}" (${pubFiles.length} published + ${conFiles.length} source files) to ${s.owner}/${s.repo}@${s.branch}${pubPrefix ? '/' + s.subdir : ''}. Live at https://${s.owner}.github.io/${s.repo}/${pubPrefix}`,
     )
   } catch (err) {
     setStatus('Deploy failed: ' + (err as Error).message)

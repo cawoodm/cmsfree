@@ -19,7 +19,7 @@ your-site/
 - **View** — plain static HTML from `publish/`. Zero JavaScript needed; `cms.js` just sleeps.
 - **Edit** — visit `?edit`. The CMS reads `content/` **from disk** and rebuilds the page in memory: generated nav, live markdown rendering, inline editing, create/rename/delete sections & pages. Nothing is written until you hit **Save**.
 - **Publish** — regenerates `publish/` (one static page per route) from a single `content/template.html`.
-- **Deploy** — pushes `publish/` to GitHub Pages via the GitHub API.
+- **Deploy** — pushes `publish/` (plus the `content/` source, for cross-machine sync) to GitHub Pages via the GitHub API.
 
 ## Content model
 
@@ -51,7 +51,18 @@ Once you've entered edit mode, a small ✎ pins to the top-left of every page so
 
 ## Deploy to GitHub Pages
 
-In edit mode, open **⚙ Settings**, enter a GitHub token + owner/repo/branch, then hit **Deploy**. It commits `publish/` to the branch (commit message = your prefix + version). Point GitHub Pages at that branch and you're live.
+In edit mode, open **⚙ Settings**, enter a GitHub token + owner/repo/branch, then hit **Deploy**. It commits **both** `publish/` and your editable `content/` source to the branch in one commit (commit message = your prefix + version). Point GitHub Pages at that branch and you're live.
+
+- `publish/` goes to the branch root, or to the optional **Subdirectory**.
+- `content/` goes to the **Content folder** (default `_content/`) so it can be synced back to another machine. A leading-underscore folder is skipped by GitHub Pages' Jekyll and can't collide with a section, so it isn't rebuilt as part of the site.
+
+## Work from a new machine (no clone)
+
+Because Deploy pushes the source too, you can pick up a site on any computer without cloning:
+
+1. Open your live site with `?edit` (this loads `cms.js`), open **⚙ Settings**, and enter owner/repo/branch (a token is only needed for a **private** repo, or to Deploy).
+2. Click **Connect folder** and pick an **empty** folder. The CMS notices it's empty and offers **Pull from GitHub** — it downloads `content/` + `publish/` into the folder, then you edit as usual.
+3. If you connect a folder that already holds an **older** copy (its `content/version.json` is behind the repo), the CMS offers to **Re-sync**. Re-sync overwrites files that exist on the repo and keeps any local-only files; it never runs when your local copy is the same or newer.
 
 ## Under the hood
 

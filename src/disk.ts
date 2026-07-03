@@ -90,6 +90,45 @@ export async function writeFile(relPath: string, text: string): Promise<void> {
   await w.close()
 }
 
+// Like writeFile but for binary payloads (images, favicon, cms.js) pulled from
+// GitHub. Creates any missing parent directories.
+export async function writeBytes(
+  relPath: string,
+  data: BufferSource,
+): Promise<void> {
+  const parts = relPath.split('/')
+  const fileName = parts.pop()!
+  const dir = await resolveDir(parts, true)
+  const fh = await dir.getFileHandle(fileName, { create: true })
+  const w = await fh.createWritable()
+  await w.write(data)
+  await w.close()
+}
+
+// Run an async task over items with bounded concurrency: each batch of `size`
+// runs in parallel, and the next batch starts only once the current one settles.
+// Keeps disk-write bursts fast without opening an unbounded number of writable
+// streams at once. Rejects (and stops) if any task in a batch throws.
+export async function inBatches<T>(
+  items: T[],
+  size: number,
+  task: (item: T) => Promise<void>,
+): Promise<void> {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(task))
+  }
+}
+
+// True if the directory at `parts` exists under the connected site root.
+export async function dirExists(parts: string[]): Promise<boolean> {
+  try {
+    await resolveDir(parts)
+    return true
+  } catch {
+    return false
+  }
+}
+
 // Remove every entry in a directory except the named ones.
 export async function removeAllExcept(
   dir: FileSystemDirectoryHandle,

@@ -21,7 +21,7 @@ import {
   evalShowExpr,
 } from './markdown'
 import { routeHref, routeToOutPath, defaultSlug } from './routes'
-import { renderBody } from './content'
+import { renderBody, applyTemplateBlocks } from './content'
 import { setStatus } from './chrome'
 import { saveAll } from './save'
 
@@ -62,6 +62,7 @@ function buildPage(
   if (navHost) navHost.innerHTML = opts.navHtml
   const contentHost = doc.querySelector('[x-cms-content]')
   if (contentHost) contentHost.innerHTML = opts.contentHtml
+  applyTemplateBlocks(doc) // fill x-cms-block="_name.md" placeholders (e.g. footer)
   // Conditionally-shown elements (e.g. the hero): resolved at publish time, so
   // static output needs no client-side JS and no trace of the expression —
   // drop elements whose expression is false, and strip the attribute off the
@@ -73,7 +74,7 @@ function buildPage(
   })
   // All output paths are RELATIVE to this page, so the site is portable to any
   // subpath (GitHub project pages), the domain root, or file://. Every page is
-  // either home (depth 0) or a section/block (depth 1), hence base '' or '../'.
+  // either home (depth 0) or a section/page (depth 1), hence base '' or '../'.
   const base = opts.isHome ? '' : '../'
   // Turn hash routes (#/about-us) into relative static links everywhere.
   doc.querySelectorAll<HTMLAnchorElement>('a[href^="#/"]').forEach((a) => {

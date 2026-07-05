@@ -1,5 +1,6 @@
-// Render a page body to HTML, expanding [include](glob) directives. Shared by
-// edit-mode preview (view.ts) and Publish (publish.ts) so both stay in sync.
+// Render a page body to HTML, expanding [include](glob) directives — the way a
+// page pulls in Blocks (_name.md) and Posts (name.part.md). Shared by edit-mode
+// preview (view.ts) and Publish (publish.ts) so both stay in sync.
 import { marked } from 'marked'
 import { model } from './state'
 import { splitFrontmatter, parseFrontmatter, titleize, globToRegExp } from './markdown'
@@ -31,10 +32,11 @@ export function matchSectionFiles(
 }
 
 // Render a page body to HTML, expanding [include](glob) directives (a line
-// containing exactly that). If sectionSlug is '' (e.g. the home page has no
-// section folder), directives are left as literal text — they degrade to a
-// harmless markdown link rather than silently vanishing, since that's not the
-// "zero matches" case the directive is meant to handle.
+// containing exactly that) — this is how a page includes its Blocks and Posts.
+// If sectionSlug is '' (e.g. the home page has no section folder), directives
+// are left as literal text — they degrade to a harmless markdown link rather
+// than silently vanishing, since that's not the "zero matches" case the
+// directive is meant to handle.
 export function renderBody(
   body: string,
   sectionSlug: string,
@@ -61,4 +63,24 @@ export function renderBody(
     html = html.replace(`<div data-cms-include="token-${i}"></div>`, inc)
   })
   return html
+}
+
+// Render a root-level Block (e.g. content/_footer.md) — for template-wide
+// content, like a shared footer, that isn't scoped to any page or section.
+function renderTemplateBlock(fileName: string): string {
+  const text = model.get(`content/${fileName}`)
+  if (!text) return ''
+  const { body } = splitFrontmatter(text)
+  return renderBody(body, '', `content/${fileName}`)
+}
+
+// Fill every template `x-cms-block="<file>"` placeholder within `root` with
+// that Block's rendered content. Used both by Publish (on the parsed
+// template doc) and edit mode (on the live document, once the shell is
+// applied) — see view.ts's applyTemplateShell().
+export function applyTemplateBlocks(root: ParentNode): void {
+  root.querySelectorAll<HTMLElement>('[x-cms-block]').forEach((el) => {
+    const name = el.getAttribute('x-cms-block')
+    if (name) el.innerHTML = renderTemplateBlock(name)
+  })
 }

@@ -4,7 +4,7 @@ import { state } from './state'
 import { readFile } from './disk'
 import { rewriteAssetRefs } from './assets'
 import { splitFrontmatter } from './markdown'
-import { renderBody } from './content'
+import { renderBody, applyTemplateBlocks } from './content'
 import { scanSections, currentSectionSlug } from './model'
 import { currentRoute } from './routes'
 import { addEditAffordance } from './editor'
@@ -34,6 +34,7 @@ export async function applyTemplateShell(): Promise<void> {
   if (doc.title) document.title = doc.title
   document.body.replaceWith(document.importNode(doc.body, true))
   rewriteAssetRefs(document) // point css/images/favicon at blob URLs (from disk)
+  applyTemplateBlocks(document) // fill x-cms-block="_name.md" placeholders (e.g. footer)
 }
 
 export function renderCurrent(): void {

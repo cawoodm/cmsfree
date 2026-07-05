@@ -19,6 +19,9 @@
     <main x-cms-content>  → the page's rendered markdown
   Elements can be conditionally shown with data-cms-show="<expression>", a JS
   expression evaluated against the current page (e.g. `page.slug`).
+  x-cms-block="_name.md" fills an element with a root-level Block's rendered
+  content (e.g. the footer, from content/_footer.md) — for template-wide
+  content that isn't scoped to any page or section.
   <title> is set per page at publish time.
 -->
 
@@ -38,10 +41,7 @@
 
 <main x-cms-content></main>
 
-<footer class="site-footer">
-  <p>Hearth &amp; Wheat Bakery &middot; 14 Elm Street, Rivermill, VT 05055 &middot; (802) 555-0142</p>
-  <p><a href="#/contact">Get in touch</a></p>
-</footer>
+<footer class="site-footer" x-cms-block="_footer.md"></footer>
 
 <!-- cms:entry -->
 </body>

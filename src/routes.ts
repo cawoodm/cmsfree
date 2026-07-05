@@ -77,8 +77,11 @@ export function defaultSlug(route: string): string {
 }
 
 export function currentRoute(): string {
-  const hash = location.hash.replace(/^#\/?/, '').replace(/\/$/, '')
-  if (hash) return hash
+  // Checking the RAW hash (not the stripped result) matters: an explicit home
+  // hash ('#/') strips to '', which is indistinguishable from "no hash at
+  // all" if you check the stripped value — wrongly falling through to the
+  // pathname below and resurrecting whatever route the page was loaded from.
+  if (location.hash) return location.hash.replace(/^#\/?/, '').replace(/\/$/, '')
   // No hash (e.g. entered ?edit directly on a published sub-page like
   // /about-us/): derive the route from the pathname so edit mode lands there.
   return location.pathname

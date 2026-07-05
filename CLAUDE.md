@@ -48,7 +48,15 @@ Deploy uses the **GitHub Git Data REST API** (blobs → tree → commit → ref)
 
 ### Content model conventions
 
-A folder under `content/` with an `index.md` is a **section** (shown in nav). Other `.md` files are unlisted blocks/pages. Frontmatter keys: `title`, `order`, `slug`. Entries prefixed `_` or `.` are ignored by the model (which is why the default `contentSubdir` is `_content` — it can never collide with a section route). `content/template.html` is the single layout source for every published page; `[data-cms-show]` expressions are resolved at publish time and stripped from the output.
+A `.md` file's role is decided by its **filename** — the single source of truth is `classifyFile()` in `src/model.ts` (full write-up in `docs/CONCEPTS.md`):
+
+- **Section** — a folder with an `index.md`; published, in the nav (`scanSections()`).
+- **Page** — `name.md` (no leading `_`, no dot in the name); published to its own URL, not in nav.
+- **Block** — `_name.md`; never published alone, only `[include]`d into a page.
+- **Post** — `name.part.md` (e.g. `index.blog-1.md`); never published alone, surfaced only in a list.
+- **Hidden** — `.name.md`; never published (reserved).
+
+`modelRoutes()` publishes only Sections and Pages. **Watch the underscore ambiguity:** on a *folder* a leading `_` is a hidden Section (still published, just not in nav, URL drops the `_`); on a *file* it's a Block (not published). Frontmatter keys: `title`, `slug`, `order`. `content/template.html` is the single layout source for every published page; `[data-cms-show]` expressions are resolved at publish time and stripped from the output.
 
 ### Module boundaries
 

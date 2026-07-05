@@ -23,10 +23,15 @@ your-site/
 
 ## Content model
 
-- A **folder** under `content/` with an `index.md` is a **section** (appears in the nav).
-- Any other `.md` in that folder is an unlisted **block/page** (link to it from content).
-- Optional frontmatter: `title:` and `order:`. `_folders` and `.files` are ignored.
-- `content/template.html` is the single source of layout for every page.
+A file's role is decided by its name (see [docs/CONCEPTS.md](docs/CONCEPTS.md)):
+
+- **Section** — a folder under `content/` with an `index.md`; published and appears in the nav.
+- **Page** — a `name.md` (no leading `_`, no dot in the name); published to its own URL but _not_ in the nav — link to it from content.
+- **Block** — a `_name.md`; never published on its own, only `[include]`d into a page.
+- **Post** — a `name.part.md` (e.g. `index.blog-1.md`); never published alone, surfaced only inside a list (e.g. a blog index).
+- **Hidden** — a `.name.md`; never published (reserved for later use).
+
+Optional frontmatter: `title:`, `slug:`, `order:`. `content/template.html` is the single source of layout for every page. (A leading `_` on a **folder** means a hidden section — still published, just out of the nav — which is different from a `_` on a file.)
 
 ## Get started
 

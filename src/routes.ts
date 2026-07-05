@@ -39,7 +39,7 @@ export function routeToRelTarget(route: string): string {
 }
 
 // A route's href from a page whose depth prefix is `base` ('' for home, '../'
-// for section/block pages). Keeps the published site path-agnostic.
+// for section/page pages). Keeps the published site path-agnostic.
 export function routeHref(route: string, base: string): string {
   const t = routeToRelTarget(route)
   return t === '' ? base || './' : base + t

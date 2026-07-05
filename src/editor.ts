@@ -1,11 +1,11 @@
 // Editing UI — content toolbar + source editor (memory only; disk on Save).
 import { state, model } from './state'
-import { currentSectionSlug, currentIsBlock } from './model'
+import { currentSectionSlug, currentIsPage } from './model'
 import { currentRoute } from './routes'
 import { markDirty } from './save'
 import { setStatus } from './chrome'
 import { contentEl, navControl, renderNav, renderCurrent } from './view'
-import { createBlock, createFragment, renameBlock, deleteBlock } from './crud'
+import { createPage, createBlock, renamePage, deletePage } from './crud'
 
 export function addEditAffordance(): void {
   const el = contentEl()
@@ -25,21 +25,21 @@ export function addEditAffordance(): void {
   if (section)
     bar.append(
       navControl('＋ page', 'Add an unlisted page to this section', () =>
-        createBlock(),
+        createPage(),
       ),
     )
   if (currentSectionSlug())
     bar.append(
       navControl(
-        '＋ fragment',
-        'Add a fragment: content appended to this page, with no page of its own',
-        () => createFragment(),
+        '＋ block',
+        'Add a block: content included into this page, with no page of its own',
+        () => createBlock(),
       ),
     )
-  if (currentIsBlock()) {
+  if (currentIsPage()) {
     bar.append(
-      navControl('✎ name', 'Rename this block', () => renameBlock()),
-      navControl('🗑 block', 'Delete this block', () => deleteBlock()),
+      navControl('✎ name', 'Rename this page', () => renamePage()),
+      navControl('🗑 page', 'Delete this page', () => deletePage()),
     )
   }
   el.prepend(bar)

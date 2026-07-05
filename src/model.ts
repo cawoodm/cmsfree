@@ -6,12 +6,34 @@ import { parseFrontmatter, titleize } from './markdown'
 
 // A content/ directory that's part of the managed model. '_assets' holds
 // static files (css/images/cms.js) copied verbatim by Publish, never parsed
-// as content, so it's excluded. Dotfiles (.git, .DS_Store, …) are OS/tooling
+// as content, so it's excluded. Dot-folders (.git, .DS_Store, …) are OS/tooling
 // noise. Everything else — including '_'-prefixed folders like '_hidden' — is
 // a real section: loaded, saved, and published, just left out of the nav (see
-// scanSections).
+// scanSections). NB: a leading '_' means different things for folders and
+// files — a '_folder' is a hidden Section (still published), a '_file.md' is a
+// Block (never published). See classifyFile() and docs/CONCEPTS.md.
 export function isManagedSectionDir(name: string): boolean {
   return name !== '_assets' && !name.startsWith('.')
+}
+
+// The domain concepts a content/ ".md" file can be, decided purely by its
+// FILENAME (the segment inside a section folder, or at content/ root). This is
+// the single source of truth for "what is this file?" — see docs/CONCEPTS.md.
+//   index.md      → the home page, or a Section's page (published, in nav)
+//   name.md       → a Page   — published, own URL, NOT in nav
+//   _name.md      → a Block  — include-only; never published on its own
+//   name.part.md  → a Post   — e.g. index.blog-1.md; a list item, never
+//                    published on its own (surfaced only inside a list)
+//   .name.md      → Hidden   — never published; reserved for later use
+export type FileKind = 'index' | 'page' | 'block' | 'post' | 'hidden'
+
+export function classifyFile(name: string): FileKind {
+  if (name.startsWith('.')) return 'hidden'
+  if (name.startsWith('_')) return 'block'
+  const base = name.replace(/\.md$/, '')
+  if (base === 'index') return 'index'
+  if (base.includes('.')) return 'post' // a dot inside the name (not the ext)
+  return 'page'
 }
 
 // Load the entire content/ tree (one level of section folders) into the model.
@@ -56,23 +78,23 @@ export function scanSections(): Section[] {
   return out
 }
 
-// Every publishable route derived from the model. A '_'-prefixed FILENAME
-// (e.g. content/services/_pricing.md) is a fragment — content meant to be
-// concatenated into another page via [include](_pricing.md), not a page in
-// its own right — so it's excluded here, same as index.md itself.
+// Every publishable route derived from the model: only Sections (an index.md)
+// and Pages get their own URL. Blocks ('_name.md'), Posts ('name.part.md') and
+// Hidden files ('.name.md') are never published on their own (see classifyFile),
+// so they're excluded here.
 export function modelRoutes(): { route: string; path: string }[] {
   const out: { route: string; path: string }[] = []
   for (const path of model.keys()) {
-    let m: RegExpExecArray | null
-    if (path === 'content/index.md') out.push({ route: '', path })
-    else if ((m = /^content\/([^/]+)\/index\.md$/.exec(path)))
-      out.push({ route: m[1], path })
-    else if (
-      (m = /^content\/([^/]+)\/([^/]+)\.md$/.exec(path)) &&
-      m[2] !== 'index' &&
-      !m[2].startsWith('_')
-    )
-      out.push({ route: `${m[1]}/${m[2]}`, path })
+    if (path === 'content/index.md') {
+      out.push({ route: '', path }) // the home page
+      continue
+    }
+    const m = /^content\/([^/]+)\/([^/]+)\.md$/.exec(path)
+    if (!m) continue
+    const [, section, name] = m
+    const kind = classifyFile(`${name}.md`)
+    if (kind === 'index') out.push({ route: section, path })
+    else if (kind === 'page') out.push({ route: `${section}/${name}`, path })
   }
   return out
 }
@@ -86,6 +108,10 @@ export function currentSectionSlug(): string {
   return slugOfPath(state.currentPath)
 }
 
-export function currentIsBlock(): boolean {
-  return /^content\/[^/]+\/(?!index\.md$)[^/]+\.md$/.test(state.currentPath)
+// True when the loaded route is a Page (a named, published, non-nav file) —
+// used to show the rename/delete-page controls. Blocks, Posts, Hidden files and
+// section index pages don't qualify.
+export function currentIsPage(): boolean {
+  const m = /^content\/[^/]+\/([^/]+)\.md$/.exec(state.currentPath)
+  return !!m && classifyFile(`${m[1]}.md`) === 'page'
 }

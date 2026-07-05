@@ -8,6 +8,10 @@ const cmsEntry = resolve(repoRoot, 'src/cms.ts').replace(/\\/g, '/')
 // Static asset SOURCE (css, images, favicon, built cms.js). Copied into
 // publish/ by Publish; ignored by the content model (underscore prefix).
 const assetsDir = resolve(repoRoot, 'example-site/content/_assets')
+// Everything the CMS reads/writes at runtime (content/ + publish/) — must be
+// watched by chokidar so Vite's static-file cache stays valid, but must
+// never trigger HMR/reload (see handleHotUpdate below).
+const exampleSiteDir = resolve(repoRoot, 'example-site')
 
 // IMPORTANT: nothing here is required at RUNTIME. The published site (publish/ +
 // cms.js) runs on ANY static web server. Vite is only a dev convenience — it
@@ -21,10 +25,10 @@ export default defineConfig({
   server: {
     // Allow importing src/cms.ts, which lives OUTSIDE the dev root.
     fs: { allow: [repoRoot] },
-    // Watch ONLY src/. Everything under example-site/ is data/output the CMS
-    // reads/writes at runtime — never dev module code — so it must not trigger
-    // reloads. src/cms.ts stays in the module graph → HMR still works.
-    watch: { ignored: ['**/example-site/**'] },
+    // No custom `watch.ignored`: chokidar needs to see example-site/ changes
+    // so Vite's static-file cache (ETag/Last-Modified for files under `root`)
+    // stays fresh after the CMS writes there. handleHotUpdate below — not
+    // watch.ignored — is what stops those writes from triggering HMR/reload.
   },
 
   plugins: [
@@ -40,6 +44,16 @@ export default defineConfig({
           /<script\s+src="(?:\.\.\/|\/)?cms\.js"><\/script>/g,
           mod,
         )
+      },
+      // example-site/ is CMS runtime data (Save/Publish writes), not dev
+      // source — chokidar still sees these changes (see server.watch above),
+      // but they must never trigger HMR/full reload. Returning [] swallows
+      // the update per file; src/cms.ts isn't under example-site/, so it
+      // falls through to undefined and keeps working via normal HMR.
+      handleHotUpdate(ctx) {
+        if (ctx.file.startsWith(exampleSiteDir)) {
+          return []
+        }
       },
     },
   ],

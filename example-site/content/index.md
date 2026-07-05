@@ -3,7 +3,7 @@ title: Home
 slug: home
 ---
 
-# Welcome to Hearth & Wheat Bakery
+# Hearth & Wheat Bakery
 
 Since 1987, we've been baking bread the slow way — long ferments, stone-milled flour, and an oven that's never gone cold. Everything in our case is made that morning, by hand, by people who live two streets over.
 

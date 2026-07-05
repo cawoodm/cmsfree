@@ -1,33 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Services</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/style.css">
-<link rel="icon" href="../favicon.ico" sizes="32x32">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="icon" href="../favicon.ico" sizes="32x32">
+  </head>
+  <body>
+    
 
+    <header class="site-header">
+      <a href="../"><img class="logo" src="../images/logo.svg" alt="Hearth & Wheat Bakery"></a>
+      <nav class="site-nav" x-cms-nav=""><ul><li><a href="../about-us/">About Us</a></li><li><a href="../history/">Our History</a></li><li><a href="../services/" class="active">Services</a></li><li><a href="../contact/">Contact</a></li><li><a href="../blog/">Blog</a></li></ul></nav>
+    </header>
 
+    
 
-<header class="site-header">
-  <a href="../"><img class="logo" src="../images/logo.svg" alt="Hearth & Wheat Bakery"></a>
-  <nav class="site-nav" x-cms-nav=""><ul><li><a href="../about-us/">About Us</a></li><li><a href="../history/">Our History</a></li><li><a href="../services/" class="active">Services</a></li><li><a href="../contact/">Contact</a></li><li><a href="../blog/">Blog</a></li></ul></nav>
-</header>
-
-<div class="hero">
-  <img src="../images/hero-bakery.svg" alt="Hearth & Wheat Bakery storefront">
-  <div class="hero-text">
-    <h1>Welcome to Hearth &amp; Wheat Bakery</h1>
-    <p>Since 1987, we've been baking bread the slow way — long ferments, stone-milled flour, and an oven that's never gone cold.</p>
-    <a class="cta" href="../services/">See what we offer →</a>
-  </div>
-</div>
-
-<main x-cms-content=""><h1>Services</h1>
+    <main x-cms-content=""><h1>Services</h1>
 <h2>Daily Bread &amp; Pastry</h2>
 <p>Fresh sourdough, rye, and seasonal loaves baked every morning. Pastries and viennoiserie available until we sell out (usually by 11am).</p>
 <h2>Custom Cakes</h2>
@@ -36,13 +28,13 @@
 <p>Trays of pastries, sandwich loaves, and coffee service for offices and events. Order 48 hours ahead.</p>
 <h2>Wholesale</h2>
 <p>We supply bread to a handful of local restaurants and cafés. Get in touch if you'd like to carry our loaves.</p>
+
 </main>
 
-<footer class="site-footer">
-  <p>Hearth &amp; Wheat Bakery · 14 Elm Street, Rivermill, VT 05055 · (802) 555-0142</p>
-  <p><a href="../contact/">Get in touch</a></p>
+    <footer class="site-footer" x-cms-block="_footer.md"><p>Hearth &amp; Wheat Bakery · 14 Elm Street, Rivermill, VT 05055 · (802) 555-0142</p>
+<p><a href="../contact/">Get in touch</a></p>
 </footer>
 
-<script src="../cms.js"></script>
-</body>
+    <script src="../cms.js"></script>
+  </body>
 </html>

@@ -1,17 +1,16 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hearth &amp; Wheat Bakery</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css">
-<link rel="icon" href="/favicon.ico" sizes="32x32">
-</head>
-<body>
-
-<!--
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hearth &amp; Wheat Bakery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+  </head>
+  <body>
+    <!--
   cmsfree layout template — the SINGLE source of page layout.
   Used both to generate every static page (Publish) and as the shell the CMS
   renders into (edit mode). The CMS fills the two placeholders:
@@ -25,24 +24,20 @@
   <title> is set per page at publish time.
 -->
 
-<header class="site-header">
-  <a href="#/"><img class="logo" src="/images/logo.svg" alt="Hearth & Wheat Bakery"></a>
-  <nav class="site-nav" x-cms-nav></nav>
-</header>
+    <header class="site-header">
+      <a href="#/"><img class="logo" src="/images/logo.svg" alt="Hearth & Wheat Bakery" /></a>
+      <nav class="site-nav" x-cms-nav></nav>
+    </header>
 
-<div class="hero" data-cms-show="page.slug !== 'home'">
-  <img src="/images/hero-bakery.svg" alt="Hearth & Wheat Bakery storefront">
-  <div class="hero-text">
-    <h1>Welcome to Hearth &amp; Wheat Bakery</h1>
-    <p>Since 1987, we've been baking bread the slow way — long ferments, stone-milled flour, and an oven that's never gone cold.</p>
-    <a class="cta" href="#/services">See what we offer &rarr;</a>
-  </div>
-</div>
+    <div class="hero" data-cms-show="page.slug === 'home'">
+      <img src="/images/hero-bakery.svg" alt="Hearth & Wheat Bakery storefront" />
+      <div class="hero-text" x-cms-block="_hero.md"></div>
+    </div>
 
-<main x-cms-content></main>
+    <main x-cms-content></main>
 
-<footer class="site-footer" x-cms-block="_footer.md"></footer>
+    <footer class="site-footer" x-cms-block="_footer.md"></footer>
 
-<!-- cms:entry -->
-</body>
+    <!-- cms:entry -->
+  </body>
 </html>

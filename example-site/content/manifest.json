@@ -18,5 +18,10 @@
     "slug": "contact",
     "title": "Contact",
     "order": 4
+  },
+  {
+    "slug": "blog",
+    "title": "Blog",
+    "order": 5
   }
 ]

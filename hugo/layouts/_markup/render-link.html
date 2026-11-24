@@ -1,0 +1,2 @@
+{{- /* Keeps tel: and other non-web schemes; the built-in hook rewrites them to #ZgotmplZ. Output matches marked. */ -}}
+<a href="{{ .Destination | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text | safeHTML }}</a>

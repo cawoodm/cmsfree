@@ -9,6 +9,7 @@ layouts/alias.html                 root redirect page (multilingual sites only)
 layouts/_partials/cms-block.html   shipped by cmsfree (copy from hugo/layouts/_partials/)
 layouts/_partials/cms-items.html   shipped by cmsfree
 layouts/_partials/cms-text.html    shipped by cmsfree
+layouts/_markup/render-link.html   shipped by cmsfree: keeps tel: links (Hugo's default turns them into #ZgotmplZ)
 content/blocks/NAME.md             single-language site: Markdown blocks, no front matter
 content/<lang>/blocks/NAME.md      multilingual site: one folder per language
 i18n/<lang>.yaml                   strings, one "key: text" line each

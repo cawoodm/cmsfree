@@ -32,18 +32,19 @@ export interface Settings {
 export interface Meta {
   commit: string
   tree: string
-  files: Record<string, string> // content path -> git blob sha
+  files: Record<string, string> // site path -> git blob sha
 }
 
-// content path ("content/en/HERO.md", "content/site.yml") -> raw file text
+// site path ("content/en/blocks/HERO.md", "content/blocks/HERO.md", "i18n/en.yaml", "hugo.toml") -> raw file text
 export const model = new Map<string, string>()
 
 export const state = {
   mode: null as Mode | null,
   root: null as FileSystemDirectoryHandle | null, // OPFS site folder or the picked local folder
   siteKey: '', // per-site key for settings, mode and folder handle (host + first path segment on github.io)
-  dirs: [] as string[], // folder names under content/ (sorted); each one is a page
-  dir: '', // folder of the page being edited ('' = the root page, content/ itself)
+  langs: [] as string[], // language folders: content/<lang>/ that contain blocks/ (sorted). [] = single-language site (content/blocks/)
+  defaultLang: 'en', // defaultContentLanguage of hugo.toml
+  lang: 'en', // language of the page being edited (the default language on a single-language site)
   base: null as Meta | null,
   dirty: new Set<string>(), // model paths not yet written to storage
   savePending: false,

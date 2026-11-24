@@ -12,7 +12,7 @@ const cmsEntry = resolve(repoRoot, 'src/cms.ts').replace(/\\/g, '/')
 const exampleDirs = [resolve(repoRoot, 'example-site'), resolve(repoRoot, 'example-site-multilingual')]
 
 // IMPORTANT: nothing here is required at RUNTIME. Sites copy the built dist/cms.js
-// into their own repo (www/public/cms.js). Vite is only a dev convenience (serves the
+// into their own repo (static/cms.js). Vite is only a dev convenience (serves the
 // rendered example, hot-swaps cms.ts) and the cms.js bundler.
 export default defineConfig(({ mode }) => ({
   // `npm run build:examples` renders the example sites; `--mode multilingual` serves the one with a folder per page (/en/, /de/).
@@ -28,13 +28,13 @@ export default defineConfig(({ mode }) => ({
 
   plugins: [
     {
-      // DEV ONLY: hot-swap the template's `<script src="cms.js">` (`../cms.js` on folder pages) for the TypeScript
+      // DEV ONLY: hot-swap the template's `<script src="cms.js">` (any path, e.g. `/cms.js` from `relURL`) for the TypeScript
       // entry so editing src/ hot-reloads. A real site keeps its real cms.js.
       name: 'cms-dev-inject',
       apply: 'serve',
       transformIndexHtml(html) {
         const mod = `<script type="module" src="/@fs/${cmsEntry}"></script>`
-        return html.replace(/<script\s+src="(?:\.\.\/|\/)?cms\.js"><\/script>/g, mod)
+        return html.replace(/<script\s+src="[^"]*cms\.js"><\/script>/g, mod)
       },
       // Writes under example-site*/ (rebuilds, autosave in folder mode) must not trigger HMR/full reload.
       // Returning [] swallows the update; src/cms.ts is not under example-site*/, so it keeps normal HMR.

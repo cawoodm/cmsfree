@@ -2,7 +2,7 @@
 // publish (changed files -> one commit via the Git Data API) and build status polling.
 // No storage and no page access: callers pass files in and get results back.
 import { dialog } from './chrome'
-import { blobSha } from './format'
+import { blobSha, isSitePath } from './format'
 import { SETTINGS_PREFIX } from './state'
 import type { Meta, Settings } from './state'
 
@@ -189,29 +189,26 @@ function fromBase64(b64: string): string {
   return new TextDecoder().decode(bytes)
 }
 
-// Only the text files of the format are edited here.
-const isContentFile = (path: string) => path.startsWith('content/') && /\.(md|yml)$/.test(path)
-
 // Current head commit sha of the branch.
 export async function getHead(s: Settings): Promise<string> {
   const ref = await gh(s.token, 'GET', `${repoPath(s)}/git/ref/heads/${s.branch}`)
   return ref.object.sha
 }
 
-// The content files of a commit: tree sha + { path: blob sha }.
+// The site files of a commit (isSitePath: blocks, i18n strings, hugo.toml): tree sha + { path: blob sha }.
 async function readTree(s: Settings, commit: string): Promise<{ tree: string; files: Record<string, string> }> {
   const c = await gh(s.token, 'GET', `${repoPath(s)}/git/commits/${commit}`)
   const t = await gh(s.token, 'GET', `${repoPath(s)}/git/trees/${c.tree.sha}?recursive=1`)
   if (t.truncated) throw new Error('The repo tree is too large to read through the API')
   const files: Record<string, string> = {}
-  for (const e of t.tree as { path: string; type: string; sha: string }[]) if (e.type === 'blob' && isContentFile(e.path)) files[e.path] = e.sha
+  for (const e of t.tree as { path: string; type: string; sha: string }[]) if (e.type === 'blob' && isSitePath(e.path)) files[e.path] = e.sha
   return { tree: c.tree.sha, files }
 }
 
 // ---------------------------------------------------------------------------
 // Pull
 // ---------------------------------------------------------------------------
-// ref -> commit -> recursive tree -> blobs under content/. Returns the texts and the new base.
+// ref -> commit -> recursive tree -> blobs of the site files. Returns the texts and the new base.
 export async function pull(s: Settings): Promise<{ files: Record<string, string>; meta: Meta }> {
   const commit = await getHead(s)
   const { tree, files } = await readTree(s, commit)

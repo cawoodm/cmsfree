@@ -3,3 +3,7 @@ dist/
 tmp/
 example-site*/dist/
 *.stackdump
+example-site*/static/cms.js
+example-site*/public/
+example-site*/resources/
+.hugo_build.lock

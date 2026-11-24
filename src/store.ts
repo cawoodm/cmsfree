@@ -1,32 +1,40 @@
-// The model and its persistence: load content/ from the storage root into memory,
-// autosave changed files after 1 s, replace content after a pull, compare to the base.
+// The model and its persistence: load the site files (content/**/blocks, i18n/*.yaml, hugo.toml) from the storage root
+// into memory, autosave changed files after 1 s, replace them after a pull, compare to the base.
 import { model, state, META_PATH } from './state'
 import type { Meta } from './state'
 import { inBatches, listFiles, readTextOrNull, removePath, writeText } from './disk'
-import { blobSha } from './format'
+import { SITE_CONFIG, blobSha, isSitePath, parseDefaultLang } from './format'
 import { setButtons, setStatus } from './chrome'
 
 const SAVE_DELAY = 1000
 let timer: number | undefined
 let queue: Promise<void> = Promise.resolve()
 
-const isContentFile = (p: string) => /(^|\/)(site\.yml|[^/]+\.md)$/.test(p)
+// Paths in the model. Multilingual site: blocks in content/<lang>/blocks/, single-language site: content/blocks/.
+// Strings are always i18n/<lang>.yaml (a single-language site uses its default language).
+export const blockPath = (lang: string, name: string) => (state.langs.length ? `content/${lang}/blocks/${name}` : `content/blocks/${name}`)
+export const stringsPath = (lang: string) => `i18n/${lang}.yaml`
 
-// Every folder directly under content/ holds the content of one page.
-function detectDirs(): void {
-  const dirs = new Set<string>()
+// Languages = folders content/<lang>/ with a blocks/ folder. Default language = defaultContentLanguage of hugo.toml.
+function detectSite(): void {
+  const langs = new Set<string>()
   for (const p of model.keys()) {
-    const m = /^content\/([^/]+)\//.exec(p)
-    if (m) dirs.add(m[1])
+    const m = /^content\/([^/]+)\/blocks\//.exec(p)
+    if (m) langs.add(m[1])
   }
-  state.dirs = [...dirs].sort()
+  state.langs = [...langs].sort()
+  state.defaultLang = parseDefaultLang(model.get(SITE_CONFIG))
 }
 
 export async function loadModel(): Promise<void> {
   model.clear()
   state.dirty.clear()
-  for (const p of (await listFiles('content')).filter(isContentFile)) model.set(p, (await readTextOrNull(p)) ?? '')
-  detectDirs()
+  const paths = [...(await listFiles('content')), ...(await listFiles('i18n')), SITE_CONFIG].filter(isSitePath)
+  for (const p of paths) {
+    const text = await readTextOrNull(p)
+    if (text !== null) model.set(p, text)
+  }
+  detectSite()
 }
 
 export async function readMeta(): Promise<Meta | null> {
@@ -43,12 +51,12 @@ export async function writeMeta(meta: Meta): Promise<void> {
   await writeText(META_PATH, JSON.stringify(meta))
 }
 
-// Browser mode: replace the local content/ folder entirely with pulled files and store the new base.
+// Browser mode: replace the local site files (content/, i18n/, hugo.toml) entirely with pulled files and store the new base.
 export async function replaceContent(files: Record<string, string>, meta: Meta): Promise<void> {
   clearTimeout(timer)
   state.dirty.clear()
   state.savePending = false
-  await removePath('content')
+  for (const p of ['content', 'i18n', SITE_CONFIG]) await removePath(p)
   await inBatches(Object.keys(files), 8, (p) => writeText(p, files[p]))
   await writeMeta(meta)
   await loadModel()
@@ -59,7 +67,7 @@ export async function replaceContent(files: Record<string, string>, meta: Meta):
 // ---------------------------------------------------------------------------
 export function setFile(path: string, text: string): void {
   model.set(path, text)
-  if (!state.dirs.includes(path.split('/')[1])) detectDirs()
+  detectSite()
   state.dirty.add(path)
   state.savePending = true
   clearTimeout(timer)

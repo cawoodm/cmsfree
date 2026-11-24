@@ -2,7 +2,7 @@
 // cmsfree engine — build target: a single self-contained `cms.js`.
 //
 // Dormant unless the URL carries `?edit` (view mode only shows a re-entry pencil
-// for returning editors). In edit mode it loads the site's content/ files into an
+// for returning editors). In edit mode it loads the site's content and i18n files into an
 // in-memory model, binds the live page to it (pencils, editor, Texts panel) and
 // autosaves changed files to the storage root:
 //   • browser mode: OPFS, synced with the GitHub repo (pull on boot, Publish = one commit)
@@ -16,7 +16,7 @@ import { idbGetHandle, opfsSiteRoot, pickDirectory, verifyPermission } from './d
 import { barActions, isEditMode, isReturningEditor, rememberEditor, setButtons, setStatus, showEditLauncher } from './chrome'
 import { ConflictError, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, watchBuild } from './github'
 import { changedFiles, flush, loadModel, readMeta, replaceContent, updateStatus, writeMeta } from './store'
-import { bindPage, initDir, openTexts, renderAll } from './page'
+import { bindPage, initLang, openTexts, renderAll } from './page'
 
 let stopWatch: (() => void) | null = null
 
@@ -129,7 +129,7 @@ async function openBrowser(): Promise<boolean> {
 
 async function resync(): Promise<void> {
   await pullInto(loadSettings())
-  initDir()
+  initLang()
   renderAll()
   await updateStatus()
 }
@@ -189,7 +189,7 @@ async function openFolder(): Promise<boolean> {
     }
     if (!handle) {
       await new Promise<void>((resolve) =>
-        setStatus('Choose the local clone of the site repo (the folder that contains content/).', {
+        setStatus('Choose the local clone of the site repo (the folder that contains hugo.toml and content/).', {
           label: 'Choose folder',
           onClick: () => void pickDirectory(state.siteKey).then((h) => ((handle = h), resolve())).catch(() => {}),
         }),
@@ -201,7 +201,7 @@ async function openFolder(): Promise<boolean> {
       setButtons({ texts: true, publish: false, gear: true })
       return true
     }
-    await new Promise<void>((resolve) => setStatus('This folder has no content/ files (.md or site.yml).', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
+    await new Promise<void>((resolve) => setStatus('This folder has no site files (content/…/blocks/*.md, i18n/*.yaml).', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
   }
 }
 
@@ -229,11 +229,11 @@ async function boot(): Promise<void> {
   const ok = state.mode === 'browser' ? await openBrowser() : await openFolder()
   if (!ok) return
   if (!model.size) {
-    setStatus('No content/ files (.md or site.yml) found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
+    setStatus('No site files (content/…/blocks/*.md, i18n/*.yaml) found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
     return
   }
   rememberEditor()
-  initDir()
+  initLang()
   bindPage()
   window.addEventListener('beforeunload', (e) => {
     if (state.savePending) {

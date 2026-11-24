@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.0.0 (2026-11-24)
+
+Sites are now plain Hugo sites. There is no custom build script and no `##placeholder##` template. Breaking change: sites in the 2.0 format must be converted (`docs/FORMAT.md`).
+
+### Breaking
+
+- **Hugo instead of `scripts/build-site.mjs`.** The page template is `layouts/home.html`. Three partials shipped in `hugo/layouts/_partials/` (`cms-block.html`, `cms-items.html`, `cms-text.html`) output the same edit markers as before: `<!--cms:KEY-->…<!--/cms-->`.
+- **New file layout.** Blocks: `content/blocks/NAME.md` (one language) or `content/<lang>/blocks/NAME.md`. Strings: `i18n/<lang>.yaml` (was `site.yml`). Static files: `static/`.
+- **Languages.** Multilingual sites use one Hugo `contentDir` per language. The default language is `defaultContentLanguage` in `hugo.toml`.
+- **Fallback.** A block or string missing in a language comes from the default language. The shared root content is gone: move root `site.yml` keys into `i18n/<defaultLang>.yaml` and root blocks into the default language.
+- **i18n key names.** A key must not be named `description` (go-i18n reserved word); the examples use `meta_description`.
+- **Removed:** `##…##` placeholders and built-ins, `scripts/build-site.mjs`, `renderPage` and `prefixRelativeUrls` in `src/format.ts`, `--default`.
+
+### Changed
+
+- **Editor.** `cms.js` loads `content/**/blocks/*.md`, `i18n/*.yaml` and `hugo.toml` (read only, for the default language). The page language comes from the URL, lookup is own language then default language, edits go to the own language. Browser mode pulls and publishes the same file set.
+- `npm run build:examples` runs `hugo` for both examples (`scripts/build-examples.mjs`) and copies `dist/cms.js` into each output. Hugo must be on the PATH.
+- The Vite dev swap matches any `<script src="…cms.js">`.
+
 ## 2.0.0 (2026-11-24)
 
 cmsfree is now only an editor. The site's own build (e.g. GitHub Actions) renders and deploys the pages. cmsfree edits the files under `content/` in the browser and commits them to GitHub. This is a breaking change: sites in the 1.x format do not work with 2.0.

@@ -1,101 +1,138 @@
-# Content format
+# Content format (v3)
 
-One template, content in `content/`. A folder under `content/` is one page. Same format as `unfolding.pt`, which uses the same fallback rule (its shared strings live in `content/site.yml`).
+A site is a plain [Hugo](https://gohugo.io) site. There is no custom build script. cmsfree ships three Hugo partials that wrap editable output in markers, and `cms.js`, the editor.
 
 ```
-www/index.html            the template, with ##placeholders##
-cms.js                    the cmsfree editor (copy of cmsfree dist/cms.js)
-content/NAME.md           root content: Markdown blocks (exact, case-sensitive names)
-content/site.yml          root content: short strings, one "key: text" line each
-content/<dir>/NAME.md     content of the page at /<dir>/ (en, de, summer, ...)
-content/<dir>/site.yml
+hugo.toml
+layouts/home.html                  the page template
+layouts/alias.html                 root redirect page (multilingual sites only)
+layouts/_partials/cms-block.html   shipped by cmsfree (copy from hugo/layouts/_partials/)
+layouts/_partials/cms-items.html   shipped by cmsfree
+layouts/_partials/cms-text.html    shipped by cmsfree
+content/blocks/NAME.md             single-language site: Markdown blocks, no front matter
+content/<lang>/blocks/NAME.md      multilingual site: one folder per language
+i18n/<lang>.yaml                   strings, one "key: text" line each
+static/cms.js                      the editor (copy of cmsfree dist/cms.js)
 ```
 
-The site's own build renders `www/index.html` once per page. cmsfree only edits the files under `content/`. See `example-site/` (flat) and `example-site-multilingual/`.
+See `example-site/` (one language) and `example-site-multilingual/` (en + de, default en). Hugo 0.147 or newer.
 
-## Pages
+## hugo.toml
 
-- **No subfolders in `content/`**: one page, `/index.html`, rendered from the root content.
-- **Subfolders in `content/`**: one page per folder, `/<dir>/index.html`. Fallback is hierarchical: a key that is missing in `content/<dir>/` comes from its parent folder, and so on up to `content/`.
-- `/index.html` is then a small redirect page. It goes to the folder that matches `navigator.languages` (first 2 letters or the full name equal to a folder name), else to the default folder (build option `--default <dir>`, else the first folder alphabetically). Without JS, a meta refresh goes to the default folder. The page also lists a link to every folder.
+Needed in every site:
 
-## Placeholders
+```toml
+disableHugoGeneratorInject = true
+defaultContentLanguage = "en"
+disableKinds = ["section", "taxonomy", "term", "rss", "sitemap", "404"]
 
-| Placeholder         | Source                              | Output                                           |
-| ------------------- | ----------------------------------- | ------------------------------------------------ |
-| `##NAME.md##`       | `content/<dir>/NAME.md`, else `content/NAME.md` | Markdown (`marked`, gfm) as HTML, trimmed |
-| `##NAME.md:items##` | same file, split at `### ` headings | `<li><div>…</div></li>` per part, joined by `\n` |
-| `##lower_key##`     | `site.yml` key (`^[a-z0-9_]+$`)     | HTML-escaped text                                |
-| `##DIR##`           | built-in                            | folder name of the page (`''` on a flat site)    |
-| `##DIR_LINKS##`     | built-in                            | links to every folder page, `''` on a flat site  |
+# Blocks are data for the partials, not pages.
+[[cascade]]
+[cascade.build]
+render = "never"
+list = "never"
+[cascade.target]
+path = "/blocks/**"
 
-`##DIR_LINKS##` renders `<a href="../<dir>/"><dir></a>`, the current page as `<span aria-current="true"><dir></span>`, separated by `<span aria-hidden="true">|</span>`. Built-ins are not editable.
+# Same HTML as marked (gfm) in cms.js.
+[markup.goldmark.parser]
+autoHeadingID = false
+[markup.goldmark.extensions.typographer]
+disable = true
+[markup.goldmark.renderer]
+unsafe = true
+```
 
-## Asset paths
+A multilingual site adds `defaultContentLanguageInSubdir = true` and one table per language:
 
-Write the template relative to the **site root** (`css/site.css`, `cms.js`). A folder page is one level deeper, so the builder puts `../` in front of every relative `src` and `href` value. It skips values that start with `/`, `#`, `../`, `http:`, `https:`, `//`, `data:`, `mailto:` or `tel:`, and values that hold a placeholder.
+```toml
+[languages.en]
+contentDir = "content/en"
+[languages.de]
+contentDir = "content/de"
+```
 
-## site.yml
+Do not use `--minify`: it strips the markers. The editor reads `defaultContentLanguage` from `hugo.toml` (regex, read-only; Hugo's default is `en`).
 
-One `key: text` line per string. Comments (`#`) and blank lines are allowed. Put the value in double quotes if it contains `: ` or ` #`, or starts with a YAML character such as `-`, `[`, `&` or `'`.
+## Partials
+
+| Template                                   | Output                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `{{ partial "cms-block.html" "NAME.md" }}` | the block as HTML (Hugo goldmark), trimmed                                           |
+| `{{ partial "cms-items.html" "NAME.md" }}` | the block split at `### ` headings: `<li><div>…</div></li>` per part, joined by `\n` |
+| `{{ partial "cms-text.html" "key" }}`      | the string `key`, HTML-escaped                                                       |
+| `{{ T "key" }}` (plain Hugo)               | the string in an attribute, `<title>` or `<script>`; no marker                       |
+
+A `cms-items` block must start with a `### ` heading. A missing block or string stops the build with an error.
+
+Use `cms-text` only in text context. Inside a tag or directly inside `<title>`, `<textarea>`, `<script>`, `<style>` a comment would show as text, so use `T` there. Those strings change on the page only after the next build.
+
+Language links: loop over `.AllTranslations` (see `example-site-multilingual/layouts/home.html`). Asset URLs: `relURL`, `absURL` or resource `.RelPermalink`.
+
+## Languages and fallback
+
+- A single-language site keeps blocks in `content/blocks/` and strings in `i18n/<defaultContentLanguage>.yaml`.
+- A multilingual site has `content/<lang>/blocks/` and `i18n/<lang>.yaml` per language, and builds `/<lang>/`.
+- Fallback: a block or string missing in a page's language comes from the **default content language**. There is no other fallback (no shared root folder).
+- A string key must not be named `description`, `other`, `one` or another go-i18n message field: Hugo then reads the whole file as one message. Use `meta_description`.
+
+`i18n/<lang>.yaml` is flat: one `key: text` line per string. Comments (`#`) and blank lines are allowed. Put the value in double quotes if it contains `: ` or ` #`, or starts with a YAML character such as `-`, `[`, `&` or `'`.
+
+## Root page of a multilingual site
+
+With `defaultContentLanguageInSubdir = true` Hugo renders `layouts/alias.html` at `/`. The example keeps the 2.0 behaviour: JS goes to the language folder that matches `navigator.languages` (first 2 letters or the full name), else to the default language, and keeps `?edit` and the hash. Without JS a meta refresh goes to the default language. The page links to every language.
 
 ## Edit markers
 
-The build wraps editable output in HTML comments so `cms.js` can find it:
+The partials wrap editable output in HTML comments so `cms.js` can find it on the live page:
 
 ```html
 <!--cms:WELCOME.md-->…rendered HTML…<!--/cms-->
-<!--cms:SERVICES.md:items--><li>…</li><!--/cms-->
+<!--cms:SERVICES.md:items-->
+<li>…</li>
+<!--/cms-->
 <!--cms:menu_home-->Home<!--/cms-->
 ```
 
-- Blocks are always wrapped.
-- Strings are wrapped only in text context. There is no marker inside a tag (attribute values such as `alt`, `content`) or directly inside `<title>`, `<textarea>`, `<script>`, `<style>`. Those strings change on the page only after the next build.
-- Built-ins are never wrapped.
-- `cms.js` takes the page folder from the URL: the last directory of `location.pathname` if it is a folder of `content/`, else the root (`/site-x/de/` is `de`, `/` is the root page).
+The markers carry no language. `cms.js` takes the page language from the URL: the last directory of `location.pathname` if it is a language folder (`/de/` is `de`), else the default language.
 
-### Lookup in the editor
+## Editor rules
 
-For a key on the page, `cms.js` reads:
-
-1. `content/<dir>/…` (`content/…` on the root page)
-2. each parent folder in turn, up to `content/…` (the root)
-
-Editing a key that came from a fallback writes it into the page's own folder (the file is created, or the key is added to its `site.yml`). The Texts panel lists the blocks that have a marker on the page, and the keys of the page's `site.yml` plus those of its parent folders up to `content/`, with the inherited value as placeholder.
+- Files the editor loads and edits: `content/**/blocks/*.md` and `i18n/*.yaml`. `hugo.toml` is read only.
+- Languages: the folders `content/<lang>/` that contain `blocks/`. If `content/blocks/` exists instead, the site is single-language.
+- Lookup of a key: the page's language, then the default language.
+- Editing a key that came from the default language writes into the page's own language: the block file is created, or the key is added to `i18n/<lang>.yaml`.
+- The Texts panel lists the blocks that have a marker on the page and the strings of the page's language plus the default language's (as placeholder).
+- Browser mode pulls and publishes `content/**`, `i18n/**` and `hugo.toml` (never changed).
+- A re-render in the browser uses `marked` (gfm) and the same items split as `cms-items.html`.
 
 ## Loader
 
-Load the editor with this loader before `</body>`. It adds `cms.js` only with `?edit` or in a browser that has edited before (`cms.js` sets `localStorage["cmsfree:editor"]`, which also shows the re-entry pencil). Visitors never download the editor.
+`cms.js` stays dormant without `?edit`. The examples load it with a plain `<script src="{{ "cms.js" | relURL }}"></script>`, which every visitor downloads. To load it only for editors, add it from JS when the URL has `?edit` or `localStorage["cmsfree:editor"]` is set (the editor sets it, and shows a re-entry pencil):
 
 ```html
 <script>
   try {
     if (new URLSearchParams(location.search.toLowerCase()).has('edit') || localStorage.getItem('cmsfree:editor') === '1') {
-      const cms = document.createElement('script');
-      cms.src = '../cms.js';
-      document.body.append(cms);
+      const cms = document.createElement('script')
+      cms.src = '{{ "cms.js" | relURL }}'
+      document.body.append(cms)
     }
   } catch {}
 </script>
 ```
 
-The builder does not rewrite paths inside scripts. The loader needs a path that is right for the page: `cms.js` on the root page, `../cms.js` on a folder page. A template used for both kinds of page can pick it in JS, for example from `document.documentElement.dataset` set by `##DIR##`. `unfolding.pt` uses `../cms.js` because all its pages live in folders.
-
-A plain `<script src="cms.js"></script>` also works (the example sites use it; the builder turns it into `../cms.js` on folder pages, and the dev server can swap in `src/cms.ts`), but every visitor then downloads the editor.
-
-## Building
+## Building and editing
 
 ```
-node scripts/build-site.mjs <siteDir> [--default <dir>]
+hugo -s <siteDir> -d <siteDir>/dist
 ```
 
-Reads `<siteDir>/www/index.html` and `<siteDir>/content/`, copies the rest of `www/` and `cms.js` to `<siteDir>/dist/`, and renders with edit markers on. It fails with a message on a missing placeholder.
-
-## Editing
+The site's own build (for example GitHub Actions running Hugo) deploys it.
 
 Add `?edit` to a page URL.
 
 - **Browser mode**: edits live in the browser (OPFS). The site repo is pulled from GitHub. **Publish** makes one commit; the site's build deploys it.
-- **Folder mode** (Chromium): pick a local clone of the site repo. Edits are written there. Commit with git.
+- **Folder mode** (Chromium): pick the local clone of the site repo (the folder with `hugo.toml`). Edits are written there. Commit with git.
 
-Both modes autosave 1 s after a change.
+Both modes autosave 1 s after a change. The repo root must be the Hugo site root.

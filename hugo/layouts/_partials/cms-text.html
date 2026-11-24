@@ -1,0 +1,5 @@
+{{- /* cmsfree: outputs the string KEY (i18n/<lang>.yaml) between edit markers; text context only (use {{ T "key" }} in attributes, <title>, <script>).
+       A key missing in the page's language comes from the default language. Usage: {{ partial "cms-text.html" "menu_home" }} */ -}}
+{{- $v := T . -}}
+{{- if not $v }}{{ errorf "%s: no string %s" site.Language.Lang . }}{{ end -}}
+{{- printf "<!--cms:%s-->" . | safeHTML }}{{ $v }}{{ "<!--/cms-->" | safeHTML -}}

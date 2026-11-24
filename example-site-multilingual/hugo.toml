@@ -1,0 +1,31 @@
+baseURL = "/"
+title = "Hearth & Wheat"
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = true
+disableHugoGeneratorInject = true
+disableKinds = ["section", "taxonomy", "term", "rss", "sitemap", "404"]
+
+[languages.en]
+contentDir = "content/en"
+languageName = "English"
+weight = 1
+[languages.de]
+contentDir = "content/de"
+languageName = "Deutsch"
+weight = 2
+
+# Blocks (content/<lang>/blocks/*.md) are data for the partials, not pages.
+[[cascade]]
+[cascade.build]
+render = "never"
+list = "never"
+[cascade.target]
+path = "/blocks/**"
+
+# Same output as marked (gfm) in cms.js.
+[markup.goldmark.parser]
+autoHeadingID = false
+[markup.goldmark.extensions.typographer]
+disable = true
+[markup.goldmark.renderer]
+unsafe = true

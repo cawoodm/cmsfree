@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{- $default := site.Sites.Default.Language.Lang }}
+<title>{{ $default }}</title>
+<script>
+  // Root page: go to the language folder that matches navigator.languages (first 2 letters or the full name), else to the default.
+  (function () {
+    var dirs = [{{ range $i, $l := site.Languages }}{{ if $i }}, {{ end }}{{ $l.Lang }}{{ end }}], target = {{ $default }}
+    var langs = navigator.languages || [navigator.language || '']
+    for (var i = 0; i < langs.length; i++) {
+      var full = String(langs[i]).toLowerCase(), short = full.slice(0, 2)
+      var hit = dirs.filter(function (d) { return d.toLowerCase() === full || d.toLowerCase() === short })[0]
+      if (hit) { target = hit; break }
+    }
+    location.replace({{ "/" | relURL }} + target + '/' + location.search + location.hash)
+  })()
+</script>
+<noscript><meta http-equiv="refresh" content="0; url={{ .Permalink }}"></noscript>
+</head>
+<body>
+{{ range site.Languages }}<a href="{{ printf "%s/" .Lang | relURL }}">{{ .Lang }}</a>
+{{ end }}</body>
+</html>

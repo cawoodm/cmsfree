@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-cmsfree is a backend-less editor for static sites that use the "unfolding" content format (`docs/FORMAT.md`). The whole engine compiles to a single self-contained `cms.js` "sleeper" that a site loads on every page but that stays **dormant** until the URL carries `?edit`. In edit mode it loads the site's `content/` files into memory, binds the live page to them (edit pencils, editor dialog, Texts panel) and autosaves. The site's own build (e.g. GitHub Actions) renders and deploys; cmsfree is only the editor.
+cmsfree is a backend-less editor for static sites that are plain Hugo sites (format: `docs/FORMAT.md`). The whole engine compiles to a single self-contained `cms.js` "sleeper" that a site loads on every page but that stays **dormant** until the URL carries `?edit`. In edit mode it loads the site's `content/**/blocks/*.md` and `i18n/*.yaml` into memory, binds the live page to them (edit pencils, editor dialog, Texts panel) and autosaves. The site's own build (Hugo, e.g. in GitHub Actions) renders and deploys; cmsfree is only the editor.
 
-**Requirements:** Node.js. Folder mode needs a Chromium browser (File System Access API); browser mode works elsewhere.
+**Requirements:** Node.js and Hugo 0.147+ on the PATH (for the examples). Folder mode needs a Chromium browser (File System Access API); browser mode works elsewhere.
 
 ## Commands
 
-- `npm run dev` - renders both example sites (`build:examples`), then Vite serves `example-site/dist` (flat) at http://localhost:5173. Open `/?edit`. `npm run dev:multilingual` serves `example-site-multilingual/dist` instead (open `/en/?edit`). The dev plugin swaps `<script src="cms.js">` / `../cms.js` for `src/cms.ts` (hot reload).
-- `npm run build` - bundle `src/cms.ts` into one IIFE: `dist/cms.js`. Sites copy it to `www/public/cms.js`. Run it after changes under `src/` if you want the built file.
-- `npm run build:examples` - `node scripts/build-site.mjs <siteDir> [--default <dir>]` for both example sites: render `www/index.html` with the content into `<siteDir>/dist/` (markers on), copy the other `www/` files, copy `dist/cms.js` if present. No `content/` subfolders: one `/index.html`. Subfolders: `/<dir>/index.html` per folder plus a redirect `/index.html`.
+- `npm run dev` - builds both example sites (`build:examples`), then Vite serves `example-site/dist` (one language) at http://localhost:5173. Open `/?edit`. `npm run dev:multilingual` serves `example-site-multilingual/dist` instead (open `/en/?edit`). The dev plugin swaps any `<script src="…cms.js">` for `src/cms.ts` (hot reload).
+- `npm run build` - bundle `src/cms.ts` into one IIFE: `dist/cms.js`. Sites copy it to `static/cms.js`. Run it after changes under `src/` if you want the built file.
+- `npm run build:examples` - `scripts/build-examples.mjs`: `hugo -s <site> -d <site>/dist --cleanDestinationDir` for both example sites, then copies `dist/cms.js` into each output if present. Never `--minify` (it strips the markers).
 - `npm run preview` - serve `example-site/dist` on a plain static server (port 4173).
 
 There is no test framework and no lint/format script. Formatting is `.prettierrc` (no semicolons, single quotes, trailing commas, width 200).
@@ -21,16 +21,16 @@ There is no test framework and no lint/format script. Formatting is `.prettierrc
 
 ### Format and markers
 
-One template (`www/index.html`) with `##placeholders##`. `content/` root files (`NAME.md` blocks + `site.yml` strings) are the root content. Each subfolder `content/<dir>/` is the content of the page at `/<dir>/` (any name: en, de, summer); fallback is hierarchical: a key missing in `content/<dir>/` comes from the parent folder, up to `content/`. Built-ins: `##DIR##`, `##DIR_LINKS##`. For folder pages the builder prefixes `../` to relative `src`/`href` values (templates are written relative to the site root). The renderer wraps editable output in comments: `<!--cms:KEY-->…<!--/cms-->`. Blocks are always wrapped; strings only in text context (not in attributes, not directly inside `title/textarea/script/style`); built-ins never. `cms.js` finds these ranges on the live page. Rules and placeholders: `docs/FORMAT.md`.
+A Hugo site: `layouts/home.html` uses three partials shipped in `hugo/layouts/_partials/` (`cms-block.html`, `cms-items.html`, `cms-text.html`; sites keep a copy). Blocks are `content/blocks/NAME.md` (one language) or `content/<lang>/blocks/NAME.md` (one Hugo `contentDir` per language), strings are `i18n/<lang>.yaml`. A block or string missing in a page's language comes from the default content language (`defaultContentLanguage` in `hugo.toml`); there is no other fallback. The partials wrap editable output in comments: `<!--cms:KEY-->…<!--/cms-->` (KEY is `NAME.md`, `NAME.md:items` or a string key). Blocks are always wrapped; strings only where `cms-text` is used (text context; `{{ T "key" }}` in attributes/`<title>` has no marker). `cms.js` finds these ranges on the live page. Rules: `docs/FORMAT.md`.
 
-`src/format.ts` is **pure** (no DOM, no FSA). It holds marked rendering, `renderPage`, marker helpers, the small `site.yml` parser and `setString` (replaces a key's line in place). Its output must stay identical to the site builds using the same format (e.g. unfolding.pt `scripts/build-content.mjs`): `new Marked({ gfm: true })`, `parse().trim()`, same `renderItems`, same `escapeHtml`. `scripts/build-site.mjs` bundles it with esbuild, so the example sites use the exact browser code.
+`src/format.ts` is **pure** (no DOM, no FSA): marked rendering, `renderItems`, marker helpers, the small i18n yaml parser, `setString` (replaces a key's line in place), `isSitePath` (the editable file set) and `parseDefaultLang`. Its output must stay identical to the partials' Hugo output: `new Marked({ gfm: true })`, `parse().trim()`, same `### ` split, same `escapeHtml`.
 
 ### Modes and storage
 
 Chosen once per site (localStorage `cmsfree:mode:<siteKey>`). Without `showDirectoryPicker` it is always browser mode.
 
-- **Browser mode:** OPFS `sites/<owner>__<repo>__<branch>/` holds `content/**` and `.cmsfree/meta.json` (the **base**: `{commit, tree, files: {path: blobSha}}` from the last pull/publish). Boot: no meta -> pull; else if the branch head differs from the base commit -> pull silently when nothing is unpublished, otherwise `confirm()`. Pull replaces the local `content/` entirely. **Publish** (`runPublish` in `cms.ts`): flush, changed = files whose git blob SHA differs from the base; if the head moved, a changed path whose head SHA differs from the base SHA is a conflict; otherwise blobs -> tree (`base_tree`) -> commit -> `PATCH ref` with `force:false`; update meta; poll `actions/runs?head_sha=` every 5 s.
-- **Folder mode:** a local clone picked via FSA; the handle is kept in IndexedDB (permission is re-granted by a user gesture). Autosave writes there. No Publish button.
+- **Browser mode:** OPFS `sites/<owner>__<repo>__<branch>/` holds the site files (`content/**`, `i18n/**`, `hugo.toml`) and `.cmsfree/meta.json` (the **base**: `{commit, tree, files: {path: blobSha}}` from the last pull/publish). Boot: no meta -> pull; else if the branch head differs from the base commit -> pull silently when nothing is unpublished, otherwise `confirm()`. Pull replaces the local site files entirely. Only `isSitePath` files are pulled, compared and published; `hugo.toml` is never changed. **Publish** (`runPublish` in `cms.ts`): flush, changed = files whose git blob SHA differs from the base; if the head moved, a changed path whose head SHA differs from the base SHA is a conflict; otherwise blobs -> tree (`base_tree`) -> commit -> `PATCH ref` with `force:false`; update meta; poll `actions/runs?head_sha=` every 5 s.
+- **Folder mode:** a local clone of the site repo (the Hugo site root, with `hugo.toml`) picked via FSA; the handle is kept in IndexedDB (permission is re-granted by a user gesture). Autosave writes there. No Publish button.
 
 Site identity: owner/repo are detected on `*.github.io`, otherwise set in the settings dialog. Settings (owner, repo, branch, token) live in localStorage `cmsfree:github:<host[/repo]>`.
 
@@ -38,14 +38,14 @@ Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of o
 
 ### Editing on the page
 
-`page.ts` pairs `cms:KEY` comments with the next `/cms` comment of the same parent (a range). Block ranges get a pencil in an absolutely positioned overlay; double-click inside any range opens its editor `<dialog>`. Re-render replaces the nodes between the markers using a `<template>` (so `<li>` parses). The page folder is the last directory of `location.pathname` if it is one of `state.dirs`, else the root (`''`). Lookup of a key: `content/<dir>/…`, then each parent folder up to `content/…`; editing a fallback key writes into the page's own folder. Edits go through `store.setFile()` -> autosave after 1 s (only changed files). `beforeunload` warns only while a save is pending.
+`page.ts` pairs `cms:KEY` comments with the next `/cms` comment of the same parent (a range). Block ranges get a pencil in an absolutely positioned overlay; double-click inside any range opens its editor `<dialog>`. Re-render replaces the nodes between the markers using a `<template>` (so `<li>` parses). `store.ts` `detectSite()` sets `state.langs` (folders `content/<lang>/` that contain `blocks/`; [] on a one-language site with `content/blocks/`) and `state.defaultLang` (from `hugo.toml`, default `en`). The page language (`initLang`) is the last directory of `location.pathname` if it is in `state.langs`, else the default language. Paths: `blockPath(lang, name)` and `stringsPath(lang)` in `store.ts`. Lookup of a key (`lookup` in `page.ts`): the page's language, then the default language; editing a fallback key writes into the page's own language. Edits go through `store.setFile()` -> autosave after 1 s (only changed files). `beforeunload` warns only while a save is pending.
 
 ### Module boundaries
 
 - `state.ts` imports nothing: shared singleton, model `Map<path, text>`, types, constants.
 - `disk.ts`: IndexedDB handle store, OPFS root, raw read/write/list/remove relative to `state.root`.
 - `format.ts`: pure (above).
-- `store.ts`: load model, autosave, base comparison, status line.
+- `store.ts`: load model, language detection, file paths, autosave, base comparison, status line.
 - `github.ts`: settings + dialog, `gh()`, pull, publish, build polling. No storage access; callers pass data in and out.
 - `page.ts`: marker ranges, pencils, editor, Texts panel, re-render.
 - `chrome.ts`: injected `cms-` CSS (sites ship no cms CSS), bar, dialog helper, launcher, edit-mode entry/exit. It gets its button handlers through the injected `barActions` object so it never imports store/github/page.

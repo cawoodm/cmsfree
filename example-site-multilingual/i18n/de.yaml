@@ -1,0 +1,6 @@
+# Kurze Texte, je eine Zeile "Schlüssel: Text". Fehlt ein Schlüssel, kommt er aus i18n/en.yaml (brand, phone, email, address).
+title: Hearth & Wheat Bäckerei
+meta_description: "Langsam gebackenes Brot und Gebäck in Rivermill, Vermont"
+menu_about: Über uns
+menu_services: Angebot
+services_title: Unser Angebot

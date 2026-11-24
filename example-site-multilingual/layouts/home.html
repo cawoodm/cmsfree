@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="{{ .Language.Lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ T "title" }}</title>
+  <meta name="description" content="{{ T "meta_description" }}">
+  <link rel="stylesheet" href="{{ "css/site.css" | relURL }}">
+</head>
+<body>
+  <header class="site-header">
+    <a href="#home" class="brand">{{ partial "cms-text.html" "brand" }}</a>
+    <nav>
+      <a href="#about">{{ partial "cms-text.html" "menu_about" }}</a>
+      <a href="#services">{{ partial "cms-text.html" "menu_services" }}</a>
+      <span class="lang">{{ range $i, $t := .AllTranslations }}{{ if $i }}<span aria-hidden="true">|</span>{{ end }}{{ if eq $t.Language.Lang $.Language.Lang }}<span aria-current="true">{{ $t.Language.Lang }}</span>{{ else }}<a href="{{ $t.RelPermalink }}">{{ $t.Language.Lang }}</a>{{ end }}{{ end }}</span>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" class="hero">
+      {{ partial "cms-block.html" "HERO.md" }}
+    </section>
+
+    <section id="about" class="about">
+      {{ partial "cms-block.html" "ABOUT.md" }}
+    </section>
+
+    <section id="services" class="services">
+      <h2>{{ partial "cms-text.html" "services_title" }}</h2>
+      <ol class="cards">{{ partial "cms-items.html" "SERVICES.md" }}</ol>
+    </section>
+  </main>
+
+  <footer class="site-footer">{{ partial "cms-text.html" "brand" }} · {{ partial "cms-text.html" "address" }} · {{ partial "cms-text.html" "phone" }} · {{ partial "cms-text.html" "email" }}</footer>
+
+  <script src="{{ "cms.js" | relURL }}"></script>
+</body>
+</html>

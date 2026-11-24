@@ -14,25 +14,38 @@ declare global {
   }
 }
 
-export const VERSION_PATH = 'content/version.json'
 export const EDITOR_FLAG = 'cmsfree:editor'
-export const GH_KEY = 'cmsfree:github'
+export const SETTINGS_PREFIX = 'cmsfree:github:'
+export const MODE_PREFIX = 'cmsfree:mode:'
+export const META_PATH = '.cmsfree/meta.json'
 
-export interface Section {
-  slug: string
-  title: string
-  order: number
+export type Mode = 'browser' | 'folder'
+
+export interface Settings {
+  owner: string
+  repo: string
+  branch: string
+  token: string
 }
 
-// content-relative path -> raw file text
+// The base: what the repo looked like at the last pull or publish.
+export interface Meta {
+  commit: string
+  tree: string
+  files: Record<string, string> // content path -> git blob sha
+}
+
+// content path ("content/en/HERO.md") -> raw file text
 export const model = new Map<string, string>()
 
-// The single mutable state singleton (was module-level `let`s in cms.ts).
 export const state = {
-  dirHandle: null as DirHandle | null,
-  connected: false,
-  dirty: false,
-  loaded: false,
-  currentText: '', // raw text (frontmatter + body) of the loaded route
-  currentPath: '', // content-relative path of the loaded route
+  mode: null as Mode | null,
+  root: null as FileSystemDirectoryHandle | null, // OPFS site folder or the picked local folder
+  siteKey: '', // per-site key for settings, mode and folder handle (host + first path segment on github.io)
+  languages: [] as string[],
+  lang: '', // language of the page being edited
+  fallbackLang: '',
+  base: null as Meta | null,
+  dirty: new Set<string>(), // model paths not yet written to storage
+  savePending: false,
 }

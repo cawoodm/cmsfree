@@ -5,65 +5,45 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = dirname(fileURLToPath(import.meta.url))
 // Absolute, forward-slashed path to the CMS entry for Vite's /@fs/ dev URL.
 const cmsEntry = resolve(repoRoot, 'src/cms.ts').replace(/\\/g, '/')
-// Static asset SOURCE (css, images, favicon, built cms.js). Copied into
-// publish/ by Publish; ignored by the content model (underscore prefix).
-const assetsDir = resolve(repoRoot, 'example-site/content/_assets')
-// Everything the CMS reads/writes at runtime (content/ + publish/) — must be
-// watched by chokidar so Vite's static-file cache stays valid, but must
-// never trigger HMR/reload (see handleHotUpdate below).
+// The example site (sources + built dist/) is dev data, not engine source: chokidar
+// must see it so Vite's static-file cache stays valid, but it must never trigger HMR/reload.
 const exampleSiteDir = resolve(repoRoot, 'example-site')
 
-// IMPORTANT: nothing here is required at RUNTIME. The published site (publish/ +
-// cms.js) runs on ANY static web server. Vite is only a dev convenience — it
-// serves publish/ statically and hot-swaps cms.ts — and the cms.js bundler.
-// The dev server serves NOTHING from content/: view mode = static publish/;
-// edit mode = cms.js reads content/ from disk (FSA) and rebuilds in memory.
+// IMPORTANT: nothing here is required at RUNTIME. Sites copy the built dist/cms.js
+// into their own repo (www/public/cms.js). Vite is only a dev convenience (serves the
+// rendered example, hot-swaps cms.ts) and the cms.js bundler.
 export default defineConfig({
-  root: resolve(repoRoot, 'example-site/publish'),
+  // `npm run build:example` renders the example site here: dist/<lang>/index.html
+  root: resolve(repoRoot, 'example-site/dist'),
   publicDir: false,
 
   server: {
     // Allow importing src/cms.ts, which lives OUTSIDE the dev root.
     fs: { allow: [repoRoot] },
-    // No custom `watch.ignored`: chokidar needs to see example-site/ changes
-    // so Vite's static-file cache (ETag/Last-Modified for files under `root`)
-    // stays fresh after the CMS writes there. handleHotUpdate below — not
-    // watch.ignored — is what stops those writes from triggering HMR/reload.
   },
 
   plugins: [
     {
-      // DEV ONLY: hot-swap the deployed `<script src="cms.js">` for the
-      // TypeScript entry so editing cms.ts hot-reloads. On a real static server
-      // the page keeps its real cms.js — this plugin does not run there.
+      // DEV ONLY: hot-swap the template's `<script src="../cms.js">` for the TypeScript
+      // entry so editing src/ hot-reloads. A real site keeps its real cms.js.
       name: 'cms-dev-inject',
       apply: 'serve',
       transformIndexHtml(html) {
         const mod = `<script type="module" src="/@fs/${cmsEntry}"></script>`
-        return html.replace(
-          /<script\s+src="(?:\.\.\/|\/)?cms\.js"><\/script>/g,
-          mod,
-        )
+        return html.replace(/<script\s+src="(?:\.\.\/|\/)?cms\.js"><\/script>/g, mod)
       },
-      // example-site/ is CMS runtime data (Save/Publish writes), not dev
-      // source — chokidar still sees these changes (see server.watch above),
-      // but they must never trigger HMR/full reload. Returning [] swallows
-      // the update per file; src/cms.ts isn't under example-site/, so it
-      // falls through to undefined and keeps working via normal HMR.
+      // Writes under example-site/ (rebuilds, autosave in folder mode) must not trigger HMR/full reload.
+      // Returning [] swallows the update; src/cms.ts is not under example-site/, so it keeps normal HMR.
       handleHotUpdate(ctx) {
-        if (ctx.file.startsWith(exampleSiteDir)) {
-          return []
-        }
+        if (ctx.file.startsWith(exampleSiteDir)) return []
       },
     },
   ],
 
   build: {
-    // Build the CMS as a single self-contained IIFE into the asset SOURCE dir,
-    // so it's the bundle Publish copies into publish/cms.js. `npm run build`
-    // refreshes content/_assets/cms.js after any cms.ts change.
-    outDir: assetsDir,
-    emptyOutDir: false, // _assets also holds css/images/favicon — don't wipe them
+    // A single self-contained IIFE: dist/cms.js
+    outDir: resolve(repoRoot, 'dist'),
+    emptyOutDir: false,
     copyPublicDir: false,
     lib: {
       entry: resolve(repoRoot, 'src/cms.ts'),

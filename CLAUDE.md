@@ -4,66 +4,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-cmsfree is a backend-less CMS for static sites. The whole engine compiles to a single self-contained `cms.js` "sleeper" that ships on every published page but stays **dormant** — it does nothing until the URL carries `?edit`. In edit mode it connects to a local folder via the browser's **File System Access API (FSA)**, turns the live static page into an in-browser editor, and writes plain markdown back to disk. There is no server, no database, and nothing depends on any framework at runtime — the published site is portable static HTML.
+cmsfree is a backend-less editor for static sites that use the "unfolding" content format (`docs/FORMAT.md`). The whole engine compiles to a single self-contained `cms.js` "sleeper" that a site loads on every page but that stays **dormant** until the URL carries `?edit`. In edit mode it loads the site's `content/` files into memory, binds the live page to them (edit pencils, editor dialog, Texts panel) and autosaves. The site's own build (e.g. GitHub Actions) renders and deploys; cmsfree is only the editor.
 
-**Requirements:** Node.js and a Chromium browser (Chrome/Edge — FSA is Chromium-only).
+**Requirements:** Node.js. Folder mode needs a Chromium browser (File System Access API); browser mode works elsewhere.
 
 ## Commands
 
-- `npm run dev` — Vite dev server at http://localhost:5173. **Edit mode lives at `/?edit`.** The dev server serves `example-site/publish/` statically and hot-swaps the `<script src="cms.js">` tag for `src/cms.ts` so editing the engine hot-reloads.
-- `npm run build` — bundle `src/cms.ts` into a single IIFE at `example-site/content/_assets/cms.js`. **You must run this after any change under `src/`** — the published site ships the built bundle, not the TypeScript. HMR only reflects `src/` edits inside the running dev server.
-- `npm run preview` — serve `example-site/publish/` on a plain static server (port 4173), proving the output runs with no dev tooling.
-- `npm run publish:content [siteRoot]` — regenerate a site's `publish/` from its `content/` on the command line (Node), using the _same_ rendering pipeline as the in-browser Publish button.
-- `npm run publish` — maintainer-only: `publish.ps1` builds, `robocopy /MIR`s the example site into a sibling `../cawoodm.github.io/cmsfree-example` checkout, and git-pushes it. Uses PowerShell + the real git CLI.
+- `npm run dev` - renders the example site (`build:example`), then Vite serves `example-site/dist` at http://localhost:5173. Open `/en/?edit`. The dev plugin swaps `<script src="../cms.js">` for `src/cms.ts` (hot reload).
+- `npm run build` - bundle `src/cms.ts` into one IIFE: `dist/cms.js`. Sites copy it to `www/public/cms.js`. Run it after changes under `src/` if you want the built file.
+- `npm run build:example` - render `example-site/www/index.html` per language into `example-site/dist/<lang>/index.html` (markers on), copy css, copy `dist/cms.js` if present.
+- `npm run preview` - serve `example-site/dist` on a plain static server (port 4173).
 
-There is **no test framework** and **no lint/format npm script**. See "Code style" below regarding the config files.
+There is no test framework and no lint/format script. Formatting is `.prettierrc` (no semicolons, single quotes, trailing commas, width 200).
 
 ## Architecture
 
-### The three tiers and the one write path
+### Format and markers
 
-Data flows `content/` → in-memory model → `publish/`, all under a single connected **site root** folder:
+One template (`www/index.html`) with `##placeholders##`, one folder per language under `content/` (`NAME.md` blocks + `site.yml` strings). The first language (`en`) is the fallback. The renderer wraps editable output in comments: `<!--cms:KEY-->…<!--/cms-->`. Blocks are always wrapped; strings only in text context (not in attributes, not directly inside `title/textarea/script/style`); built-ins never. `cms.js` finds these ranges on the live page. Rules and placeholders: `docs/FORMAT.md`.
 
-- **`content/`** — the editable markdown source (plus `template.html`, `_assets/`, `manifest.json`, `version.json`). The one source of truth you edit.
-- **`model`** (`src/state.ts`) — a `Map<contentPath, rawText>`. On connect the entire `content/` tree is read into it. **All edits — text and structural create/rename/delete — mutate this map only.** Nothing touches disk until Save.
-- **`publish/`** — generated static HTML, one pre-rendered page per route, plus copied assets. Regenerated wholesale on Publish; never hand-edited.
+`src/format.ts` is **pure** (no DOM, no FSA). It holds marked rendering, `renderPage`, marker helpers, the small `site.yml` parser and `setString` (replaces a key's line in place). Its output must stay identical to the site builds using the same format (unfolding.pt `scripts/build-content.mjs`): `new Marked({ gfm: true })`, `parse().trim()`, same `renderItems`, same `escapeHtml`. `scripts/build-example.mjs` bundles it with esbuild, so the example uses the exact browser code.
 
-`src/save.ts` (`saveAll`) is the **only** code path that writes `content/` to disk: it flushes every model file, regenerates `manifest.json`, prunes disk entries no longer in the model, and bumps `content/version.json` exactly once. Publish auto-saves first, then rebuilds `publish/` and mirrors the version.
+### Modes and storage
 
-### Boot sequence (`src/cms.ts`)
+Chosen once per site (localStorage `cmsfree:mode:<siteKey>`). Without `showDirectoryPicker` it is always browser mode.
 
-`boot()` runs on every page but returns immediately unless `?edit` is set (view mode just shows a re-entry pencil for returning editors). In edit mode it: `ensureConnected()` (restore the FSA handle from IndexedDB or prompt to connect) → `ensureSynced()` (pull from GitHub if the folder is empty, or offer re-sync if the local copy is older — see sync below) → `loadModel()` → render nav + route. Edits stay in memory; `beforeunload` warns on unsaved changes.
+- **Browser mode:** OPFS `sites/<owner>__<repo>__<branch>/` holds `content/**` and `.cmsfree/meta.json` (the **base**: `{commit, tree, files: {path: blobSha}}` from the last pull/publish). Boot: no meta -> pull; else if the branch head differs from the base commit -> pull silently when nothing is unpublished, otherwise `confirm()`. Pull replaces the local `content/` entirely. **Publish** (`runPublish` in `cms.ts`): flush, changed = files whose git blob SHA differs from the base; if the head moved, a changed path whose head SHA differs from the base SHA is a conflict; otherwise blobs -> tree (`base_tree`) -> commit -> `PATCH ref` with `force:false`; update meta; poll `actions/runs?head_sha=` every 5 s.
+- **Folder mode:** a local clone picked via FSA; the handle is kept in IndexedDB (permission is re-granted by a user gesture). Autosave writes there. No Publish button.
 
-### FSA + persistence (`src/disk.ts`)
+Site identity: owner/repo are detected on `*.github.io`, otherwise set in the settings dialog. Settings (owner, repo, branch, token) live in localStorage `cmsfree:github:<host[/repo]>`.
 
-All disk I/O goes through here: the IndexedDB handle store (survives reloads; permission must be re-granted via a user gesture), `readFile`/`writeFile`/`writeBytes`/`resolveDir`, and `inBatches(items, size, task)` for bounded-concurrency writes (Save and Publish write files 8 at a time). The connected handle is a **site root** containing both `content/` and `publish/` — not a git clone.
+Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of owner, repo, branch, token>` ("Copy setup link"). On boot `importSetupLink()` stores those settings for the site, forces browser mode and strips the fragment from the address bar and history. The fragment never reaches a server, but base64 is not encryption: the link is as secret as the token.
 
-### Shared rendering pipeline — keep in sync
+### Editing on the page
 
-`renderPages()` in `src/publish.ts` is the pure template→HTML pipeline. It is used by **both** the in-browser `publishSite()` and the CLI `scripts/publish-content.mjs` (which bundles the engine's pure modules with esbuild and polyfills `DOMParser`/`NodeFilter` via `linkedom`). This is deliberate so the browser and CLI never drift — when changing rendering, both paths get it automatically, but be aware anything you add to `buildPage`/`renderPages` must stay browser-and-Node safe (no FSA, no DOM beyond what linkedom provides).
-
-### GitHub deploy & sync (`src/github.ts`, `src/sync.ts`)
-
-Deploy uses the **GitHub Git Data REST API** (blobs → tree → commit → ref) — no git binary, no clone. It pushes `publish/` (to the branch root or an optional `subdir`) **and** the `content/` source (to `contentSubdir`, default `_content`) in one commit, so another machine can reconstruct the whole project. `sync.ts` is the reverse: pull `content/` + `publish/` into an empty folder, or re-sync when the local `content/version.json` is behind the repo's. The `gh()` helper is token-optional (public repos pull anonymously). Settings (token, owner, repo, branch, subdirs, commit prefix) live in `localStorage` under `cmsfree:github`; there is no config file.
-
-### Content model conventions
-
-A `.md` file's role is decided by its **filename** — the single source of truth is `classifyFile()` in `src/model.ts` (full write-up in `docs/CONCEPTS.md`):
-
-- **Section** — a folder with an `index.md`; published, in the nav (`scanSections()`).
-- **Page** — `name.md` (no leading `_`, no dot in the name); published to its own URL, not in nav.
-- **Block** — `_name.md`; never published alone, only `[include]`d into a page.
-- **Post** — `name.part.md` (e.g. `index.blog-1.md`); never published alone, surfaced only in a list.
-- **Hidden** — `.name.md`; never published (reserved).
-
-`modelRoutes()` publishes only Sections and Pages. **Watch the underscore ambiguity:** on a *folder* a leading `_` is a hidden Section (still published, just not in nav, URL drops the `_`); on a *file* it's a Block (not published). Frontmatter keys: `title`, `slug`, `order`. `content/template.html` is the single layout source for every published page; `[data-cms-show]` expressions are resolved at publish time and stripped from the output.
+`page.ts` pairs `cms:KEY` comments with the next `/cms` comment of the same parent (a range). Block ranges get a pencil in an absolutely positioned overlay; double-click inside any range opens its editor `<dialog>`. Re-render replaces the nodes between the markers using a `<template>` (so `<li>` parses). The page language is `<html lang>`, falling back to the first language folder. Edits go through `store.setFile()` -> autosave after 1 s (only changed files). `beforeunload` warns only while a save is pending.
 
 ### Module boundaries
 
-`src/state.ts` imports nothing — it holds the shared singleton, types, and constants. `src/chrome.ts` (the edit bar UI) receives its button handlers via an injected `barActions` object rather than importing `save`/`publish`/`github`, to avoid upward import cycles; `cms.ts` is the entry that wires those handlers together.
+- `state.ts` imports nothing: shared singleton, model `Map<path, text>`, types, constants.
+- `disk.ts`: IndexedDB handle store, OPFS root, raw read/write/list/remove relative to `state.root`.
+- `format.ts`: pure (above).
+- `store.ts`: load model, autosave, base comparison, status line.
+- `github.ts`: settings + dialog, `gh()`, pull, publish, build polling. No storage access; callers pass data in and out.
+- `page.ts`: marker ranges, pencils, editor, Texts panel, re-render.
+- `chrome.ts`: injected `cms-` CSS (sites ship no cms CSS), bar, dialog helper, launcher, edit-mode entry/exit. It gets its button handlers through the injected `barActions` object so it never imports store/github/page.
+- `cms.ts`: boot and wiring (mode choice, pull/resync, publish).
 
 ## Code style
 
-- codified in `.prettierrc`.
-
-The engine is content-agnostic: `src/` must never hardcode anything about a specific site's `content/` or `publish/`. `example-site/` is sample data/output, not part of the engine.
+- Codified in `.prettierrc`. English identifiers and comments.
+- The engine is content-agnostic: `src/` must never hardcode anything about a specific site. `example-site/` is sample data, not part of the engine.

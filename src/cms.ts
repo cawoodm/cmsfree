@@ -1,217 +1,253 @@
+/// <reference types="vite/client" />
 // cmsfree engine — build target: a single self-contained `cms.js`.
 //
-// Content-agnostic: this bundle knows nothing about any specific site's
-// content/ or publish/. It activates only when the URL carries `?edit`, then
-// connects (via the File System Access API) to the SITE ROOT — the directory
-// that contains both `content/` (the editable markdown source) and `publish/`
-// (the generated static site).
-//
-// Editing model: on connect, the entire content/ tree is read into an
-// in-memory model. ALL edits — page text and structural create/rename/delete —
-// mutate the in-memory model only. Nothing is written to disk, and no version
-// is bumped, until the user clicks the global Save button, which flushes the
-// whole model to disk in one pass and bumps content/version.json once.
+// Dormant unless the URL carries `?edit` (view mode only shows a re-entry pencil
+// for returning editors). In edit mode it loads the site's content/ files into an
+// in-memory model, binds the live page to it (pencils, editor, Texts panel) and
+// autosaves changed files to the storage root:
+//   • browser mode: OPFS, synced with the GitHub repo (pull on boot, Publish = one commit)
+//   • folder mode:  a local clone picked with the File System Access API
 //
 // This entry module wires the pieces together; each concern lives in its own
-// module (state, disk, model, assets, content, chrome, save, publish, github,
-// view, editor, crud, router). Vite bundles them into one `cms.js`.
-import { state, EDITOR_FLAG } from './state'
-import {
-  idbGetHandle,
-  connectDirectory,
-  verifyPermission,
-  dirExists,
-} from './disk'
-import { loadModel } from './model'
-import { loadAssetUrls } from './assets'
-import {
-  isEditMode,
-  showEditLauncher,
-  setStatus,
-  updateSaveButton,
-  barActions,
-} from './chrome'
-import { saveAll } from './save'
-import { publishSite } from './publish'
-import { deployToGitHub, openSettingsDialog, loadGhSettings } from './github'
-import {
-  pullFromGitHub,
-  localContentVersion,
-  remoteContentVersion,
-} from './sync'
-import { applyTemplateShell, renderNav } from './view'
-import { renderRoute, onNavClick } from './router'
+// module (state, disk, format, store, github, page, chrome).
+import { MODE_PREFIX, state } from './state'
+import type { Mode, Settings } from './state'
+import { idbGetHandle, opfsSiteRoot, pickDirectory, verifyPermission } from './disk'
+import { barActions, isEditMode, isReturningEditor, rememberEditor, setButtons, setStatus, showEditLauncher } from './chrome'
+import { ConflictError, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, watchBuild } from './github'
+import { changedFiles, flush, loadModel, readMeta, replaceContent, updateStatus, writeMeta } from './store'
+import { bindPage, initLanguage, openTexts, renderAll } from './page'
 
-// Register the top-bar button handlers (keeps chrome free of upward imports).
-barActions.onSave = () => void saveAll()
-barActions.onPublish = () => void publishSite()
-barActions.onDeploy = () => void deployToGitHub()
-barActions.onSettings = () => openSettingsDialog()
+let stopWatch: (() => void) | null = null
 
-// Ensures state.dirHandle is usable. Restores a stored handle (re-granting
-// permission via a user gesture), or shows a persistent Connect prompt. Never
-// silently falls back to read-only while ?edit is set.
-async function ensureConnected(): Promise<boolean> {
-  if (state.dirHandle && (await verifyPermission(state.dirHandle, false)))
-    return true
+// ---------------------------------------------------------------------------
+// Mode
+// ---------------------------------------------------------------------------
+const modeKey = () => MODE_PREFIX + state.siteKey
 
-  const stored = await idbGetHandle()
-  if (stored) {
-    if (await verifyPermission(stored, false)) {
-      state.dirHandle = stored
-      return true
-    }
-    // Permission can't be re-granted silently after reload — needs a gesture.
-    return new Promise((resolve) => {
-      setStatus('Reconnect to continue editing.', 'Reconnect', async () => {
-        if (await verifyPermission(stored, true)) {
-          state.dirHandle = stored
-          resolve(true)
-        } else {
-          setStatus(
-            'Permission denied. Editing needs folder access.',
-            'Try again',
-            () => location.reload(),
-          )
-          resolve(false)
-        }
-      })
-    })
+function storedMode(): Mode | null {
+  try {
+    const m = localStorage.getItem(modeKey())
+    return m === 'browser' || m === 'folder' ? m : null
+  } catch {
+    return null
   }
+}
 
+function storeMode(mode: Mode): void {
+  try {
+    localStorage.setItem(modeKey(), mode)
+  } catch {
+    /* storage blocked: ask again next time */
+  }
+}
+
+// Forget the stored mode and boot again, which asks anew.
+function changeMode(): void {
+  try {
+    localStorage.removeItem(modeKey())
+  } catch {
+    /* ignore */
+  }
+  location.reload()
+}
+
+// Chosen once per site. Without the File System Access API only browser mode exists.
+async function chooseMode(): Promise<Mode> {
+  const stored = storedMode()
+  if (stored && (stored === 'browser' || 'showDirectoryPicker' in window)) return stored
+  if (!('showDirectoryPicker' in window)) {
+    storeMode('browser')
+    return 'browser'
+  }
   return new Promise((resolve) => {
-    setStatus(
-      'Connect your site folder to start editing.',
-      'Connect folder',
-      async () => {
-        try {
-          await connectDirectory()
-          resolve(true)
-        } catch {
-          setStatus(
-            'Folder not connected. Editing needs folder access.',
-            'Connect folder',
-            () => location.reload(),
-          )
-          resolve(false)
-        }
-      },
-    )
+    const pick = (m: Mode) => () => {
+      storeMode(m)
+      resolve(m)
+    }
+    setStatus('Where should your edits live?', { label: 'Edit in browser', onClick: pick('browser') }, { label: 'Use local folder', onClick: pick('folder') })
   })
 }
 
-// Ensure the connected folder holds a content/ tree to edit. Two cases:
-//  • Empty folder (new machine, no clone): block on a Pull prompt until the
-//    site is pulled from GitHub. If owner/repo aren't set yet, the prompt opens
-//    Settings first. Never resolves until content/ exists — you can't edit an
-//    empty folder.
-//  • Existing copy: best-effort compare local vs repo content version and, if
-//    the repo is strictly newer, offer a blocking Re-sync before we load the
-//    model (so the in-memory model reflects the freshly pulled files). Runs
-//    before loadModel(). Local-ahead / equal / offline → proceed silently.
-async function ensureSynced(): Promise<void> {
-  if (await dirExists(['content'])) {
-    await maybeOfferResync()
+// ---------------------------------------------------------------------------
+// Browser mode
+// ---------------------------------------------------------------------------
+// Settings must be complete before anything else. Cancelling waits for the user to try again.
+async function ensureSettings(note: string): Promise<Settings> {
+  for (;;) {
+    const s = loadSettings()
+    if (settingsComplete(s)) return s
+    const saved = await openSettingsDialog(note, changeMode)
+    if (!saved) await new Promise<void>((resolve) => setStatus('GitHub settings are needed to load the site.', { label: 'Open settings', onClick: resolve }))
+  }
+}
+
+// Pull and replace the local content; on failure offer Try again / Settings until it works.
+async function pullInto(s: Settings): Promise<void> {
+  for (;;) {
+    try {
+      setStatus('Pulling the site from GitHub…')
+      const { files, meta } = await pull(s)
+      await replaceContent(files, meta)
+      return
+    } catch (err) {
+      await new Promise<void>((resolve) =>
+        setStatus(
+          'Pull failed: ' + (err as Error).message,
+          { label: 'Try again', onClick: resolve },
+          { label: 'Settings', onClick: () => void openSettingsDialog('', changeMode).then(() => resolve()) },
+        ),
+      )
+      s = loadSettings()
+    }
+  }
+}
+
+async function openBrowser(): Promise<boolean> {
+  const s = await ensureSettings('Enter the GitHub repo of this site. The token is optional for pulling a public repo.')
+  state.root = await opfsSiteRoot(siteFolderName(s))
+  void navigator.storage?.persist?.()
+  state.base = await readMeta()
+  if (!state.base) {
+    await pullInto(s)
+  } else {
+    await loadModel()
+    let head: string | null = null
+    try {
+      head = await getHead(s)
+    } catch {
+      /* offline or rate limited: keep working on the local copy */
+    }
+    if (head && head !== state.base.commit) {
+      if ((await changedFiles()).length === 0) await pullInto(s)
+      else if (confirm('The site changed on GitHub and you have unpublished changes.\n\nOK discards your local changes and re-syncs.\nCancel keeps them (Publish merges if the files do not overlap).')) await pullInto(s)
+    }
+  }
+  setButtons({ texts: true, publish: true, gear: true })
+  return true
+}
+
+async function resync(): Promise<void> {
+  await pullInto(loadSettings())
+  initLanguage()
+  renderAll()
+  await updateStatus()
+}
+
+async function runPublish(): Promise<void> {
+  let s = loadSettings()
+  if (!s.token) {
+    const saved = await openSettingsDialog('Publishing needs a token with contents write access.', changeMode)
+    s = loadSettings()
+    if (!saved || !s.token) return
+  }
+  await flush()
+  const changed = await changedFiles()
+  if (!changed.length) {
+    setStatus('Nothing to publish')
     return
   }
-  await pullEmptyFolder()
+  stopWatch?.()
+  setStatus('Publishing…')
+  setButtons({ publishEnabled: false })
+  try {
+    const res = await publish(s, changed, state.base!)
+    await writeMeta(res.meta)
+    if (res.moved) {
+      // The branch had other changes: take them in so local files match the new base.
+      const pulled = await pull(s)
+      await replaceContent(pulled.files, pulled.meta)
+      renderAll()
+    }
+    stopWatch = watchBuild(s, res.meta.commit, (b) => {
+      if (b.state === 'building') setStatus('Published. Building…')
+      else if (b.state === 'live') setStatus('Live. Reload to see it.', { label: 'Reload', onClick: () => location.reload() })
+      else if (b.state === 'failed') setStatus('Build failed.', { label: 'Open run', onClick: () => window.open(b.url, '_blank') })
+      else setStatus('Published. No build result yet.')
+    })
+  } catch (err) {
+    if (err instanceof ConflictError) setStatus(err.message, { label: 'Re-sync (discard my changes)', onClick: () => void resync() })
+    else setStatus('Publish failed: ' + (err as Error).message, { label: 'Try again', onClick: () => void runPublish() })
+    setButtons({ publishEnabled: true })
+  }
 }
 
-function pullEmptyFolder(): Promise<void> {
-  return new Promise((resolve) => {
-    const attempt = async (): Promise<void> => {
-      const s = loadGhSettings()
-      if (!s.owner || !s.repo) {
-        openSettingsDialog(
-          'This folder is empty. Enter owner + repo (token optional for a public repo) to pull the site.',
-        )
-        setStatus(
-          'Empty folder — set owner + repo in Settings, then pull.',
-          'Pull from GitHub',
-          () => void attempt(),
-        )
-        return
-      }
-      try {
-        await pullFromGitHub(s)
-        resolve()
-      } catch (err) {
-        setStatus('Pull failed: ' + (err as Error).message, 'Try again', () =>
-          void attempt(),
-        )
+// ---------------------------------------------------------------------------
+// Folder mode
+// ---------------------------------------------------------------------------
+// Gets a usable folder handle: restore the stored one (a user gesture re-grants permission) or pick one.
+async function openFolder(): Promise<boolean> {
+  for (;;) {
+    let handle = await idbGetHandle(state.siteKey)
+    if (handle && !(await verifyPermission(handle, false))) {
+      const h = handle
+      const granted = await new Promise<boolean>((resolve) => setStatus('Reconnect to continue editing.', { label: 'Reconnect', onClick: () => void verifyPermission(h, true).then(resolve) }))
+      if (!granted) {
+        setStatus('Permission denied. Editing needs folder access.', { label: 'Try again', onClick: () => location.reload() })
+        return false
       }
     }
-    const ready = (() => {
-      const s = loadGhSettings()
-      return !!(s.owner && s.repo)
-    })()
-    setStatus(
-      'This folder is empty. Pull the site from GitHub to start editing.',
-      ready ? 'Pull from GitHub' : 'Set up GitHub',
-      () => void attempt(),
-    )
-  })
+    if (!handle) {
+      await new Promise<void>((resolve) =>
+        setStatus('Choose the local clone of the site repo (the folder that contains content/).', {
+          label: 'Choose folder',
+          onClick: () => void pickDirectory(state.siteKey).then((h) => ((handle = h), resolve())).catch(() => {}),
+        }),
+      )
+    }
+    state.root = handle!
+    await loadModel()
+    if (state.languages.length) {
+      setButtons({ texts: true, publish: false, gear: true })
+      return true
+    }
+    await new Promise<void>((resolve) => setStatus('This folder has no content/<lang>/ files.', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
+  }
 }
 
-async function maybeOfferResync(): Promise<void> {
-  const s = loadGhSettings()
-  if (!s.owner || !s.repo) return
-  const local = await localContentVersion()
-  const remote = await remoteContentVersion(s)
-  if (remote == null || remote <= local) return // equal, local ahead, or unknown
-  const yes = confirm(
-    `A newer version of this site (v${remote}) is on GitHub — your local copy is v${local}.\n\n` +
-      'Re-sync now? This downloads the repo and overwrites matching local files ' +
-      '(local-only files are kept).',
-  )
-  if (!yes) return
-  try {
-    await pullFromGitHub(s)
-  } catch (err) {
-    setStatus('Re-sync failed: ' + (err as Error).message)
-  }
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+barActions.onPublish = () => void runPublish()
+barActions.onTexts = () => openTexts()
+barActions.onSettings = () => {
+  if (state.mode === 'browser') void openSettingsDialog('', changeMode)
+  else if (confirm('Forget this folder and choose the storage mode again?')) changeMode()
 }
 
 async function boot(): Promise<void> {
   if (!isEditMode()) {
     // View mode: dormant, except a returning editor gets a re-entry pencil.
-    if (localStorage.getItem(EDITOR_FLAG) === '1') showEditLauncher()
+    if (isReturningEditor()) showEditLauncher()
     return
   }
-  setStatus('cmsfree — connecting…') // show the edit bar immediately
-  const ok = await ensureConnected()
+  setStatus('cmsfree: starting…') // show the edit bar immediately
+  state.siteKey = siteKey()
+  // A setup link carries the GitHub settings; it always means browser mode.
+  if (importSetupLink()) storeMode('browser')
+  state.mode = await chooseMode()
+  const ok = state.mode === 'browser' ? await openBrowser() : await openFolder()
   if (!ok) return
-  state.connected = true
-  localStorage.setItem(EDITOR_FLAG, '1') // remember this browser is an editor
-  await ensureSynced() // empty folder → pull; stale copy → offer re-sync
-  await loadModel()
-  await loadAssetUrls() // read content/_assets from disk → in-memory blob URLs
-  try {
-    await applyTemplateShell() // rebuild the page from content/template.html (disk)
-  } catch (err) {
-    setStatus('Could not read content/template.html: ' + (err as Error).message)
+  if (!state.languages.length) {
+    setStatus('No content/<lang>/ files found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
     return
   }
-  setStatus('Connected. Edits stay in memory until you Save.')
-  updateSaveButton() // now that we're connected, reveal Save + Publish
-  document.addEventListener('click', onNavClick)
-  window.addEventListener('hashchange', () => renderRoute())
+  rememberEditor()
+  initLanguage()
+  bindPage()
   window.addEventListener('beforeunload', (e) => {
-    if (state.dirty) {
+    if (state.savePending) {
       e.preventDefault()
-      e.returnValue = '' // prompt before losing unsaved in-memory edits
+      e.returnValue = '' // a save is still pending
     }
   })
-  renderNav()
-  renderRoute()
+  await updateStatus()
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', boot)
+  document.addEventListener('DOMContentLoaded', () => void boot())
 } else {
   void boot()
 }
 
 if (import.meta.hot) import.meta.hot.accept()
-
-export { isEditMode }

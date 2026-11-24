@@ -1,0 +1,116 @@
+:root {
+  --cream: #fbf1e4;
+  --terracotta: #a8502a;
+  --brown: #4a2e20;
+  --wheat: #d9a653;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font: 17px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--brown);
+  background: var(--cream);
+}
+
+a {
+  color: var(--terracotta);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.2;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background: var(--cream);
+  border-bottom: 1px solid rgba(74, 46, 32, 0.15);
+}
+
+.brand {
+  font: 700 1.3rem Georgia, serif;
+  color: var(--brown);
+}
+
+.site-header nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.lang {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.lang [aria-current] {
+  font-weight: 700;
+}
+
+main > section {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+.hero {
+  text-align: center;
+  padding-top: 5rem;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  margin: 0 0 1rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cards li {
+  display: flex;
+}
+
+.cards li > div {
+  flex: 1;
+  padding: 1.25rem;
+  background: #fff;
+  border-top: 4px solid var(--wheat);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(74, 46, 32, 0.08);
+}
+
+.cards h3 {
+  margin-top: 0;
+}
+
+.site-footer {
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #fbf1e4;
+  background: var(--brown);
+}

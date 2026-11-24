@@ -35,16 +35,15 @@ export interface Meta {
   files: Record<string, string> // content path -> git blob sha
 }
 
-// content path ("content/en/HERO.md") -> raw file text
+// content path ("content/en/HERO.md", "content/site.yml") -> raw file text
 export const model = new Map<string, string>()
 
 export const state = {
   mode: null as Mode | null,
   root: null as FileSystemDirectoryHandle | null, // OPFS site folder or the picked local folder
   siteKey: '', // per-site key for settings, mode and folder handle (host + first path segment on github.io)
-  languages: [] as string[],
-  lang: '', // language of the page being edited
-  fallbackLang: '',
+  dirs: [] as string[], // folder names under content/ (sorted); each one is a page
+  dir: '', // folder of the page being edited ('' = the root page, content/ itself)
   base: null as Meta | null,
   dirty: new Set<string>(), // model paths not yet written to storage
   savePending: false,

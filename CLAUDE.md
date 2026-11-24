@@ -10,9 +10,9 @@ cmsfree is a backend-less editor for static sites that use the "unfolding" conte
 
 ## Commands
 
-- `npm run dev` - renders the example site (`build:example`), then Vite serves `example-site/dist` at http://localhost:5173. Open `/en/?edit`. The dev plugin swaps `<script src="../cms.js">` for `src/cms.ts` (hot reload).
+- `npm run dev` - renders both example sites (`build:examples`), then Vite serves `example-site/dist` (flat) at http://localhost:5173. Open `/?edit`. `npm run dev:multilingual` serves `example-site-multilingual/dist` instead (open `/en/?edit`). The dev plugin swaps `<script src="cms.js">` / `../cms.js` for `src/cms.ts` (hot reload).
 - `npm run build` - bundle `src/cms.ts` into one IIFE: `dist/cms.js`. Sites copy it to `www/public/cms.js`. Run it after changes under `src/` if you want the built file.
-- `npm run build:example` - render `example-site/www/index.html` per language into `example-site/dist/<lang>/index.html` (markers on), copy css, copy `dist/cms.js` if present.
+- `npm run build:examples` - `node scripts/build-site.mjs <siteDir> [--default <dir>]` for both example sites: render `www/index.html` with the content into `<siteDir>/dist/` (markers on), copy the other `www/` files, copy `dist/cms.js` if present. No `content/` subfolders: one `/index.html`. Subfolders: `/<dir>/index.html` per folder plus a redirect `/index.html`.
 - `npm run preview` - serve `example-site/dist` on a plain static server (port 4173).
 
 There is no test framework and no lint/format script. Formatting is `.prettierrc` (no semicolons, single quotes, trailing commas, width 200).
@@ -21,9 +21,9 @@ There is no test framework and no lint/format script. Formatting is `.prettierrc
 
 ### Format and markers
 
-One template (`www/index.html`) with `##placeholders##`, one folder per language under `content/` (`NAME.md` blocks + `site.yml` strings). The first language (`en`) is the fallback. The renderer wraps editable output in comments: `<!--cms:KEY-->…<!--/cms-->`. Blocks are always wrapped; strings only in text context (not in attributes, not directly inside `title/textarea/script/style`); built-ins never. `cms.js` finds these ranges on the live page. Rules and placeholders: `docs/FORMAT.md`.
+One template (`www/index.html`) with `##placeholders##`. `content/` root files (`NAME.md` blocks + `site.yml` strings) are the root content. Each subfolder `content/<dir>/` is the content of the page at `/<dir>/` (any name: en, de, summer); fallback is hierarchical: a key missing in `content/<dir>/` comes from the parent folder, up to `content/`. Built-ins: `##DIR##`, `##DIR_LINKS##`. For folder pages the builder prefixes `../` to relative `src`/`href` values (templates are written relative to the site root). The renderer wraps editable output in comments: `<!--cms:KEY-->…<!--/cms-->`. Blocks are always wrapped; strings only in text context (not in attributes, not directly inside `title/textarea/script/style`); built-ins never. `cms.js` finds these ranges on the live page. Rules and placeholders: `docs/FORMAT.md`.
 
-`src/format.ts` is **pure** (no DOM, no FSA). It holds marked rendering, `renderPage`, marker helpers, the small `site.yml` parser and `setString` (replaces a key's line in place). Its output must stay identical to the site builds using the same format (unfolding.pt `scripts/build-content.mjs`): `new Marked({ gfm: true })`, `parse().trim()`, same `renderItems`, same `escapeHtml`. `scripts/build-example.mjs` bundles it with esbuild, so the example uses the exact browser code.
+`src/format.ts` is **pure** (no DOM, no FSA). It holds marked rendering, `renderPage`, marker helpers, the small `site.yml` parser and `setString` (replaces a key's line in place). Its output must stay identical to the site builds using the same format (e.g. unfolding.pt `scripts/build-content.mjs`): `new Marked({ gfm: true })`, `parse().trim()`, same `renderItems`, same `escapeHtml`. `scripts/build-site.mjs` bundles it with esbuild, so the example sites use the exact browser code.
 
 ### Modes and storage
 
@@ -38,7 +38,7 @@ Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of o
 
 ### Editing on the page
 
-`page.ts` pairs `cms:KEY` comments with the next `/cms` comment of the same parent (a range). Block ranges get a pencil in an absolutely positioned overlay; double-click inside any range opens its editor `<dialog>`. Re-render replaces the nodes between the markers using a `<template>` (so `<li>` parses). The page language is `<html lang>`, falling back to the first language folder. Edits go through `store.setFile()` -> autosave after 1 s (only changed files). `beforeunload` warns only while a save is pending.
+`page.ts` pairs `cms:KEY` comments with the next `/cms` comment of the same parent (a range). Block ranges get a pencil in an absolutely positioned overlay; double-click inside any range opens its editor `<dialog>`. Re-render replaces the nodes between the markers using a `<template>` (so `<li>` parses). The page folder is the last directory of `location.pathname` if it is one of `state.dirs`, else the root (`''`). Lookup of a key: `content/<dir>/…`, then each parent folder up to `content/…`; editing a fallback key writes into the page's own folder. Edits go through `store.setFile()` -> autosave after 1 s (only changed files). `beforeunload` warns only while a save is pending.
 
 ### Module boundaries
 
@@ -54,4 +54,4 @@ Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of o
 ## Code style
 
 - Codified in `.prettierrc`. English identifiers and comments.
-- The engine is content-agnostic: `src/` must never hardcode anything about a specific site. `example-site/` is sample data, not part of the engine.
+- The engine is content-agnostic: `src/` must never hardcode anything about a specific site. `example-site/` and `example-site-multilingual/` are sample data, not part of the engine.

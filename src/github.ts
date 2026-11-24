@@ -11,7 +11,7 @@ export { blobSha }
 // ---------------------------------------------------------------------------
 // Site identity + settings
 // ---------------------------------------------------------------------------
-// On <owner>.github.io the owner comes from the host. Pages live at /<lang>/ (user site) or /<repo>/<lang>/ (project site).
+// On <owner>.github.io the owner comes from the host. Pages live at /, /<dir>/ (user site) or /<repo>/, /<repo>/<dir>/ (project site); <html lang> tells a folder page from a repo folder.
 export function detectSite(): { owner: string; repo: string } | null {
   if (!location.hostname.endsWith('.github.io')) return null
   const owner = location.hostname.split('.')[0]

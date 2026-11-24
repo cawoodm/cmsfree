@@ -1,5 +1,5 @@
 node_modules/
 dist/
 tmp/
-example-site/dist/
+example-site*/dist/
 *.stackdump

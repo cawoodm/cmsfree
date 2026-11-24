@@ -4,7 +4,11 @@
 // entry registers, so this module never imports the store/github/page modules.
 import { EDITOR_FLAG } from './state'
 
+// package.json version, injected by Vite (`define` in vite.config.ts).
+declare const __CMSFREE_VERSION__: string
+
 const BAR_HEIGHT = 40
+const REPO_URL = 'https://github.com/cawoodm/cmsfree'
 
 // Sites ship no cms CSS: everything the editor needs is injected here, namespaced with "cms-".
 const CSS = `
@@ -24,7 +28,7 @@ const CSS = `
 .cms-overlay{position:absolute;top:0;left:0;width:0;height:0;z-index:2147482000}
 .cms-pencil{position:absolute;width:26px;height:26px;padding:0;border:none;border-radius:50%;background:#3b82f6;color:#fff;font:14px/26px system-ui,sans-serif;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4);opacity:.85}
 .cms-pencil:hover{opacity:1}
-.cms-dialog{width:min(720px,92vw);max-height:86vh;padding:18px;border:none;border-radius:10px;background:#fff;color:#1b1f24;font:14px/1.4 system-ui,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.4);overflow:auto}
+.cms-dialog{margin:auto;width:min(720px,92vw);max-height:86vh;padding:18px;border:none;border-radius:10px;background:#fff;color:#1b1f24;font:14px/1.4 system-ui,sans-serif;box-shadow:0 10px 40px rgba(0,0,0,.4);overflow:auto}
 .cms-dialog::backdrop{background:rgba(0,0,0,.45)}
 .cms-dialog h2{margin:0 0 10px;font:600 16px/1.3 system-ui,sans-serif}
 .cms-dialog h3{margin:16px 0 6px;font:600 13px/1.3 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:#59626d}
@@ -40,6 +44,11 @@ const CSS = `
 .cms-dialog .cms-list{display:flex;flex-wrap:wrap;gap:6px}
 .cms-dialog [hidden]{display:none}
 .cms-dialog .cms-copy-link{margin-right:auto}
+.cms-dialog.cms-about{width:min(420px,92vw);text-align:center}
+.cms-dialog.cms-about h2{font-size:22px;margin-bottom:2px}
+.cms-dialog.cms-about .cms-version{font-size:12px}
+.cms-dialog.cms-about a{color:#3b82f6}
+.cms-dialog.cms-about .cms-row{justify-content:center}
 `
 
 export function injectStyles(): void {
@@ -101,7 +110,7 @@ export function isReturningEditor(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Top edit bar:  [ status ] [ transient actions ] ........ [ Texts ] [ Publish ] [ ⚙ ] [ × ]
+// Top edit bar:  [ status ] [ transient actions ] ........ [ Texts ] [ Publish ] [ ⚙ ] [ ? ] [ × ]
 // ---------------------------------------------------------------------------
 export const barActions = {
   onPublish: () => {},
@@ -143,9 +152,10 @@ export function ensureBar(): HTMLElement {
   const texts = button('Texts', 'cms-texts', () => barActions.onTexts())
   const publish = button('Publish', 'cms-publish cms-primary', () => barActions.onPublish())
   const gear = button('⚙', 'cms-gear cms-icon', () => barActions.onSettings(), 'GitHub settings')
+  const help = button('?', 'cms-help cms-icon', showAbout, 'About cmsfree')
   const done = button('×', 'cms-done cms-icon', exitEditMode, 'Exit edit mode')
   for (const b of [texts, publish, gear]) b.style.display = 'none'
-  bar.append(msg, actions, spacer, texts, publish, gear, done)
+  bar.append(msg, actions, spacer, texts, publish, gear, help, done)
   document.body.prepend(bar)
   document.body.style.paddingTop = `${BAR_HEIGHT}px` // push the page down below the fixed bar
   return bar
@@ -179,4 +189,31 @@ export function dialog(className = ''): HTMLDialogElement {
   d.addEventListener('close', () => d.remove())
   document.body.append(d)
   return d
+}
+
+// The "?" dialog: name, version, a link to the repo and a short pitch.
+export function showAbout(): void {
+  const d = dialog('cms-about')
+  const title = document.createElement('h2')
+  title.textContent = 'CMSFree'
+  const version = document.createElement('p')
+  version.className = 'cms-version'
+  version.textContent = `Version ${__CMSFREE_VERSION__}`
+  const pitch = document.createElement('p')
+  pitch.textContent = 'A tiny CMS with no backend: edit your static site right on the page and publish straight to GitHub. No server, no database, no lock-in, just your files.'
+  const link = document.createElement('a')
+  link.href = REPO_URL
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  link.textContent = 'github.com/cawoodm/cmsfree'
+  const linkLine = document.createElement('p')
+  linkLine.append(link)
+  const row = document.createElement('div')
+  row.className = 'cms-row'
+  row.append(button('Close', 'cms-primary', () => d.close()))
+  d.append(title, version, pitch, linkLine, row)
+  d.addEventListener('click', (e) => {
+    if (e.target === d) d.close() // backdrop click
+  })
+  d.showModal()
 }

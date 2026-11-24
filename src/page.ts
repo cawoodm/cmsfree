@@ -1,7 +1,7 @@
 // Binds the live page to the model: finds the <!--cms:KEY-->…<!--/cms--> ranges,
 // overlays edit pencils, opens the editor and Texts dialogs, and re-renders ranges.
 import { model, state } from './state'
-import { isBlockKey, isMarkerClose, markerKey, parseStrings, renderKeyHtml, setString, splitKey } from './format'
+import { isBlockKey, isMarkerClose, parseMarker, parseStrings, renderKeyHtml, setString, splitKey } from './format'
 import { dialog } from './chrome'
 import { setFile } from './store'
 
@@ -16,29 +16,38 @@ let overlay: HTMLElement | null = null
 const pencils = new Map<Rng, HTMLButtonElement>()
 
 // ---------------------------------------------------------------------------
-// Content lookup (page language first, then the fallback language)
+// Content lookup: the page's folder, then each parent folder up to content/
 // ---------------------------------------------------------------------------
-const blockPath = (lang: string, name: string) => `content/${lang}/${name}`
-const yamlPath = (lang: string) => `content/${lang}/site.yml`
+// content/<dir>/<name>, or content/<name> for the root ('')
+const contentPath = (dir: string, name: string) => (dir ? `content/${dir}/${name}` : `content/${name}`)
 
-function stringsOf(lang: string): Record<string, string> {
-  return parseStrings(model.get(yamlPath(lang)) ?? '')
+const stringsOf = (dir: string): Record<string, string> => parseStrings(model.get(contentPath(dir, 'site.yml')) ?? '')
+
+// "a/b" -> ["a/b", "a", ""]; '' -> [""]
+function chain(dir: string): string[] {
+  const out: string[] = []
+  for (let d = dir; d; d = d.includes('/') ? d.slice(0, d.lastIndexOf('/')) : '') out.push(d)
+  out.push('')
+  return out
 }
 
-// The source text for a key and whether it came from the fallback language.
-function lookup(key: string): { text: string; fallback: boolean } | null {
+// The source text for a key, the file it came from and whether that is not the page's own folder.
+function lookup(key: string): { text: string; file: string; fallback: boolean } | null {
   const { name } = splitKey(key)
-  const own = isBlockKey(key) ? model.get(blockPath(state.lang, name)) : stringsOf(state.lang)[key]
-  if (own !== undefined) return { text: own, fallback: false }
-  if (state.fallbackLang === state.lang) return null
-  const fb = isBlockKey(key) ? model.get(blockPath(state.fallbackLang, name)) : stringsOf(state.fallbackLang)[key]
-  return fb === undefined ? null : { text: fb, fallback: true }
+  const file = isBlockKey(key) ? name : 'site.yml'
+  for (const from of chain(state.dir)) {
+    const text = isBlockKey(key) ? model.get(contentPath(from, name)) : stringsOf(from)[key]
+    if (text !== undefined) return { text, file: contentPath(from, file), fallback: from !== state.dir }
+  }
+  return null
 }
 
-// Page language = <html lang>; unknown languages fall back to the first language folder.
-export function initLanguage(): void {
-  const wanted = document.documentElement.lang
-  state.lang = state.languages.includes(wanted) ? wanted : state.fallbackLang
+// Page folder = the last directory of the URL path if it is a content folder, else the root.
+export function initDir(): void {
+  const parts = location.pathname.split('/').filter(Boolean)
+  if (parts[parts.length - 1] === 'index.html') parts.pop()
+  const last = parts[parts.length - 1]
+  state.dir = last && state.dirs.includes(last) ? last : ''
 }
 
 // ---------------------------------------------------------------------------
@@ -52,10 +61,10 @@ function scan(): void {
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const c = n as Comment
     const parent = c.parentNode!
-    if (markerKey(c.data) !== null) open.set(parent, c)
+    if (parseMarker(c.data) !== null) open.set(parent, c)
     else if (isMarkerClose(c.data) && open.has(parent)) {
       const start = open.get(parent)!
-      ranges.push({ key: markerKey(start.data)!, start, end: c })
+      ranges.push({ key: parseMarker(start.data)!, start, end: c })
       open.delete(parent)
     }
   }
@@ -136,6 +145,7 @@ export function openEditor(key: string): void {
   const { name } = splitKey(key)
   const block = isBlockKey(key)
   const found = lookup(key)
+  const file = block ? name : 'site.yml'
   const d = dialog()
   d.innerHTML = `
     <h2></h2>
@@ -145,13 +155,12 @@ export function openEditor(key: string): void {
       <button type="button" class="cms-btn cms-cancel">Cancel</button>
       <button type="button" class="cms-btn cms-primary cms-ok">OK</button>
     </div>`
-  ;(d.querySelector('h2') as HTMLElement).textContent = `${name} (${state.lang})`
+  ;(d.querySelector('h2') as HTMLElement).textContent = state.dir ? `${name} (${state.dir})` : name
   const note = d.querySelector('.cms-note') as HTMLElement
   if (!found || found.fallback) {
     note.hidden = false
-    note.textContent = block
-      ? `No ${state.lang} text yet. OK creates ${blockPath(state.lang, name)}.`
-      : `No ${state.lang} text yet. OK adds "${key}" to ${yamlPath(state.lang)}.`
+    const shown = found ? ` (shown: ${found.file})` : ''
+    note.textContent = `No ${state.dir || 'page'} text yet${shown}. OK ${block ? 'creates' : `adds "${key}" to`} ${contentPath(state.dir, file)}.`
   }
   const area = d.querySelector('textarea') as HTMLTextAreaElement
   area.value = found?.text ?? ''
@@ -172,40 +181,39 @@ export function openEditor(key: string): void {
   area.focus()
 }
 
-// Writes the new text to the model (autosave follows) and re-renders the page.
+// Writes the new text to the page's own folder (autosave follows) and re-renders the page.
 function apply(key: string, text: string): void {
   const { name } = splitKey(key)
-  if (isBlockKey(key)) setFile(blockPath(state.lang, name), text)
-  else setFile(yamlPath(state.lang), setString(model.get(yamlPath(state.lang)) ?? '', key, text))
+  const yaml = contentPath(state.dir, 'site.yml')
+  if (isBlockKey(key)) setFile(contentPath(state.dir, name), text)
+  else setFile(yaml, setString(model.get(yaml) ?? '', key, text))
   renderName(name)
 }
 
 // ---------------------------------------------------------------------------
-// Texts panel: every block and every site.yml key of the page language
+// Texts panel: the blocks on this page and the site.yml strings (own folder + fallback)
 // ---------------------------------------------------------------------------
 export function openTexts(): void {
-  const prefix = `content/${state.lang}/`
-  const fbPrefix = `content/${state.fallbackLang}/`
-  const names = new Set<string>()
-  for (const p of model.keys()) {
-    if (p.startsWith(prefix) && p.endsWith('.md')) names.add(p.slice(prefix.length))
-    if (p.startsWith(fbPrefix) && p.endsWith('.md')) names.add(p.slice(fbPrefix.length))
-  }
-  const own = stringsOf(state.lang)
-  const fb = state.fallbackLang === state.lang ? {} : stringsOf(state.fallbackLang)
+  const blockRanges = new Map<string, Rng>()
+  for (const r of ranges) if (isBlockKey(r.key) && !blockRanges.has(splitKey(r.key).name)) blockRanges.set(splitKey(r.key).name, r)
+  const yaml = contentPath(state.dir, 'site.yml')
+  const own = stringsOf(state.dir)
+  const fb: Record<string, string> = {}
+  for (const dir of chain(state.dir).slice(1).reverse()) Object.assign(fb, stringsOf(dir))
   const keys = [...new Set([...Object.keys(fb), ...Object.keys(own)])]
 
   const d = dialog()
   d.innerHTML = `
-    <h2>Texts (${state.lang})</h2>
+    <h2></h2>
     <h3>Blocks</h3>
     <div class="cms-list cms-blocks"></div>
     <h3>Strings</h3>
     <p>Strings used in attributes (alt, title, meta description) change on the page only after the next build.</p>
     <div class="cms-strings"></div>
     <div class="cms-row"><button type="button" class="cms-btn cms-primary cms-close">Close</button></div>`
+  ;(d.querySelector('h2') as HTMLElement).textContent = state.dir ? `Texts (${state.dir})` : 'Texts'
   const blocks = d.querySelector('.cms-blocks') as HTMLElement
-  for (const n of [...names].sort()) {
+  for (const [n, r] of [...blockRanges].sort(([a], [b]) => a.localeCompare(b))) {
     const b = document.createElement('button')
     b.type = 'button'
     b.className = 'cms-btn'
@@ -221,7 +229,7 @@ export function openTexts(): void {
     input.value = own[k] ?? ''
     if (fb[k] !== undefined) input.placeholder = fb[k]
     input.addEventListener('change', () => {
-      setFile(yamlPath(state.lang), setString(model.get(yamlPath(state.lang)) ?? '', k, input.value))
+      setFile(yaml, setString(model.get(yaml) ?? '', k, input.value))
       renderName(k)
     })
     label.append(input)
@@ -234,10 +242,12 @@ export function openTexts(): void {
 // ---------------------------------------------------------------------------
 // Bind
 // ---------------------------------------------------------------------------
-// Language links keep ?edit.
+// Links to other pages of the site keep ?edit: same-origin, not a pure #hash, and no file extension other than .html.
 function keepEditInLinks(): void {
-  for (const a of document.querySelectorAll<HTMLAnchorElement>('a[hreflang]')) {
+  for (const a of document.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+    if (a.getAttribute('href')!.startsWith('#')) continue
     const url = new URL(a.href, location.href)
+    if (url.origin !== location.origin || (/\.[A-Za-z0-9]+$/.test(url.pathname) && !/\.html$/i.test(url.pathname))) continue
     if (!new URLSearchParams(url.search.toLowerCase()).has('edit')) {
       url.search = url.search ? url.search + '&edit' : '?edit'
       a.href = url.toString()
@@ -272,7 +282,7 @@ export function bindPage(): void {
     'click',
     (e) => {
       const a = e.target instanceof Element ? e.target.closest('a') : null
-      if (a && !a.hasAttribute('hreflang') && rangeAt(e.clientX, e.clientY, a)) e.preventDefault()
+      if (a && rangeAt(e.clientX, e.clientY, a)) e.preventDefault()
     },
     true,
   )

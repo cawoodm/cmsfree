@@ -10,24 +10,23 @@ const SAVE_DELAY = 1000
 let timer: number | undefined
 let queue: Promise<void> = Promise.resolve()
 
-const isContentFile = (p: string) => /\.(md|yml)$/.test(p)
+const isContentFile = (p: string) => /(^|\/)(site\.yml|[^/]+\.md)$/.test(p)
 
-// Languages are the folders under content/; "en" (if present) is the fallback, else the first.
-function detectLanguages(): void {
-  const langs = new Set<string>()
+// Every folder directly under content/ holds the content of one page.
+function detectDirs(): void {
+  const dirs = new Set<string>()
   for (const p of model.keys()) {
     const m = /^content\/([^/]+)\//.exec(p)
-    if (m) langs.add(m[1])
+    if (m) dirs.add(m[1])
   }
-  state.languages = [...langs].sort((a, b) => (a === 'en' ? -1 : b === 'en' ? 1 : a.localeCompare(b)))
-  state.fallbackLang = state.languages[0] ?? ''
+  state.dirs = [...dirs].sort()
 }
 
 export async function loadModel(): Promise<void> {
   model.clear()
   state.dirty.clear()
   for (const p of (await listFiles('content')).filter(isContentFile)) model.set(p, (await readTextOrNull(p)) ?? '')
-  detectLanguages()
+  detectDirs()
 }
 
 export async function readMeta(): Promise<Meta | null> {
@@ -60,7 +59,7 @@ export async function replaceContent(files: Record<string, string>, meta: Meta):
 // ---------------------------------------------------------------------------
 export function setFile(path: string, text: string): void {
   model.set(path, text)
-  if (!state.languages.includes(path.split('/')[1])) detectLanguages()
+  if (!state.dirs.includes(path.split('/')[1])) detectDirs()
   state.dirty.add(path)
   state.savePending = true
   clearTimeout(timer)

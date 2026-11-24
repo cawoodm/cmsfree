@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="##DIR##">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>##title##</title>
+  <meta name="description" content="##description##">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="#home" class="brand">##brand##</a>
+    <nav>
+      <a href="#about">##menu_about##</a>
+      <a href="#services">##menu_services##</a>
+      <span class="lang">##DIR_LINKS##</span>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" class="hero">
+      ##HERO.md##
+    </section>
+
+    <section id="about" class="about">
+      ##ABOUT.md##
+    </section>
+
+    <section id="services" class="services">
+      <h2>##services_title##</h2>
+      <ol class="cards">##SERVICES.md:items##</ol>
+    </section>
+  </main>
+
+  <footer class="site-footer">##brand## · ##address## · ##phone## · ##email##</footer>
+
+  <script src="cms.js"></script>
+</body>
+</html>

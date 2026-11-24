@@ -1,5 +1,5 @@
 // The content format: pure functions, no DOM, no FSA. Used by cms.js in the
-// browser and by scripts/build-example.mjs in Node. The rendering must stay
+// browser and by scripts/build-site.mjs in Node. The rendering must stay
 // identical to the site builds that use the same format (e.g. unfolding.pt).
 import { Marked } from 'marked'
 
@@ -42,7 +42,7 @@ export function wrapMarker(key: string, html: string): string {
 }
 
 // The key of an opening marker comment (its text, without <!-- -->), or null.
-export function markerKey(commentText: string): string | null {
+export function parseMarker(commentText: string): string | null {
   return commentText.startsWith('cms:') ? commentText.slice(4) : null
 }
 
@@ -142,25 +142,25 @@ export interface Content {
 }
 
 export interface PageOptions extends Content {
-  lang: string
-  languages: string[]
-  // Used for content missing in `lang` (never for the fallback language itself).
-  fallback?: Content & { lang: string }
-  // Wrap editable output in <!--cms:KEY-->…<!--/cms--> comments.
+  // Folder name of the page ('' for the root page of a flat site) and all folder names of the site.
+  dir: string
+  dirs: string[]
+  // Used for content missing in the page's own content: the root content (null on the root page).
+  fallback?: Content | null
+  // Wrap editable output in <!--cms:KEY-->…<!--/cms--> comments. The fallback here is the root content.
   markers?: boolean
   // Called once with the placeholders that used the fallback, e.g. ["##title##"].
   onFallback?: (used: string[]) => void
 }
 
 export function renderPage(template: string, opts: PageOptions): string {
-  const { lang, languages, blocks, strings, markers = false } = opts
-  const fb = opts.fallback && opts.fallback.lang !== lang ? opts.fallback : null
+  const { dir, dirs, blocks, strings, markers = false } = opts
+  const fb = opts.fallback ?? null
+  const where = dir ? `content/${dir}/` : 'content/'
+  const label = dir || '/'
   const builtins: Record<string, () => string> = {
-    LANG: () => lang,
-    LANG_SWITCH: () =>
-      languages
-        .map((l) => (l === lang ? `<span aria-current="true">${l.toUpperCase()}</span>` : `<a href="../${l}/" hreflang="${l}" lang="${l}">${l.toUpperCase()}</a>`))
-        .join('<span aria-hidden="true">|</span>'),
+    DIR: () => dir,
+    DIR_LINKS: () => dirs.map((d) => (d === dir ? `<span aria-current="true">${d}</span>` : `<a href="../${d}/">${d}</a>`)).join('<span aria-hidden="true">|</span>'),
   }
   const fallbacks: string[] = []
 
@@ -173,13 +173,13 @@ export function renderPage(template: string, opts: PageOptions): string {
           source = fb.blocks
           fallbacks.push(`##${fullKey}##`)
         } else {
-          throw new Error(`${lang}: no content for placeholder ##${key}## (expected file content/${lang}/${key}${fb ? ` and content/${fb.lang}/${key}` : ''}; the name is case-sensitive)`)
+          throw new Error(`${label}: no content for placeholder ##${key}## (expected file ${where}${key}${fb ? ` or content/${key}` : ''}; the name is case-sensitive)`)
         }
       }
       const out = mode === 'items' ? renderItems(source[key]) : renderBlock(source[key])
       return markers ? wrapMarker(fullKey, out) : out
     }
-    if (mode) throw new Error(`${lang}: ##${key}:${mode}## is only allowed on a .md placeholder`)
+    if (mode) throw new Error(`${label}: ##${key}:${mode}## is only allowed on a .md placeholder`)
     if (/^[a-z0-9_]+$/.test(key)) {
       let source = strings
       if (!(key in strings)) {
@@ -187,17 +187,26 @@ export function renderPage(template: string, opts: PageOptions): string {
           source = fb.strings
           fallbacks.push(`##${key}##`)
         } else {
-          throw new Error(`${lang}: no content for placeholder ##${key}## (expected key "${key}" in content/${lang}/site.yml${fb ? ` and content/${fb.lang}/site.yml` : ''})`)
+          throw new Error(`${label}: no content for placeholder ##${key}## (expected key "${key}" in ${where}site.yml${fb ? ' or content/site.yml' : ''})`)
         }
       }
       const out = escapeHtml(source[key])
       return markers && isTextContext(template, offset) ? wrapMarker(key, out) : out
     }
     if (/^[A-Z0-9_]+$/.test(key) && builtins[key]) return builtins[key]()
-    throw new Error(`${lang}: unknown placeholder ##${key}## (use ##NAME.md## for a file, ##lowercase_key## for site.yml, or a built-in: ${Object.keys(builtins).join(', ')})`)
+    throw new Error(`${label}: unknown placeholder ##${key}## (use ##NAME.md## for a file, ##lowercase_key## for site.yml, or a built-in: ${Object.keys(builtins).join(', ')})`)
   })
   opts.onFallback?.(fallbacks)
   return html
+}
+
+// Templates reference assets relative to the site root. A folder page lives one level deeper, so every relative
+// src/href value gets "../" in front. Absolute, hash, parent-relative and scheme URLs stay; so do values that hold a placeholder.
+export function prefixRelativeUrls(html: string, prefix = '../'): string {
+  return html.replace(/\b(src|href)=(["'])([^"']*)\2/gi, (all, attr: string, q: string, value: string) => {
+    if (!value || value.includes('##') || /^(\/|#|\.\.\/|https?:|\/\/|data:|mailto:|tel:)/i.test(value)) return all
+    return `${attr}=${q}${prefix}${value}${q}`
+  })
 }
 
 // Git blob SHA-1: sha1("blob " + byteLength + "\0" + utf8 bytes), as hex.

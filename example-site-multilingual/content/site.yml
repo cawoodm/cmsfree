@@ -1,0 +1,4 @@
+# Strings shared by every page. A folder's site.yml overrides them.
+brand: Hearth & Wheat
+phone: (802) 555-0142
+email: hello@hearthandwheat.example

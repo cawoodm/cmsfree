@@ -7,10 +7,13 @@ Add `?edit` to any page and a dormant script (`cms.js`) wakes up, loads the site
 ```
 your-site/
   www/index.html            template with ##placeholders##
-  www/public/cms.js         the cmsfree editor (this repo's dist/cms.js)
-  content/<lang>/NAME.md    Markdown blocks
-  content/<lang>/site.yml   short strings
+  www/cms.js                the cmsfree editor (this repo's dist/cms.js)
+  content/NAME.md           Markdown blocks (root content)
+  content/site.yml          short strings
+  content/<dir>/...         optional: one folder per page (en, de, summer, ...)
 ```
+
+Without subfolders the site is one page. With subfolders each folder is a page at `/<dir>/`, the root files are shared defaults, and `/` redirects to the folder that matches the browser language.
 
 See [docs/FORMAT.md](docs/FORMAT.md) for the format and the edit markers.
 
@@ -23,13 +26,14 @@ See [docs/FORMAT.md](docs/FORMAT.md) for the format and the edit markers.
 
 ```bash
 npm install
-npm run dev            # renders example-site and serves it at http://localhost:5173/en/
+npm run dev                  # renders both examples, serves example-site at http://localhost:5173/
+npm run dev:multilingual     # serves example-site-multilingual (/en/, /de/)
 ```
 
-Open **http://localhost:5173/en/?edit** and choose **Use local folder**, then pick `example-site/`. Edits are written to `example-site/content/`; run `npm run build:example` to render them.
+Open **http://localhost:5173/?edit** (multilingual: **/en/?edit**) and choose **Use local folder**, then pick `example-site/` (or `example-site-multilingual/`). Edits are written to its `content/`; run `npm run build:examples` to render them.
 
 ```bash
-npm run build          # bundle the editor -> dist/cms.js (copy it into a site's www/public/)
+npm run build          # bundle the editor -> dist/cms.js (copy it into a site)
 npm run preview        # serve example-site/dist on a plain static server
 ```
 

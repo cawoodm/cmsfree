@@ -10,13 +10,13 @@
 //
 // This entry module wires the pieces together; each concern lives in its own
 // module (state, disk, format, store, github, page, chrome).
-import { MODE_PREFIX, state } from './state'
+import { MODE_PREFIX, model, state } from './state'
 import type { Mode, Settings } from './state'
 import { idbGetHandle, opfsSiteRoot, pickDirectory, verifyPermission } from './disk'
 import { barActions, isEditMode, isReturningEditor, rememberEditor, setButtons, setStatus, showEditLauncher } from './chrome'
 import { ConflictError, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, watchBuild } from './github'
 import { changedFiles, flush, loadModel, readMeta, replaceContent, updateStatus, writeMeta } from './store'
-import { bindPage, initLanguage, openTexts, renderAll } from './page'
+import { bindPage, initDir, openTexts, renderAll } from './page'
 
 let stopWatch: (() => void) | null = null
 
@@ -129,7 +129,7 @@ async function openBrowser(): Promise<boolean> {
 
 async function resync(): Promise<void> {
   await pullInto(loadSettings())
-  initLanguage()
+  initDir()
   renderAll()
   await updateStatus()
 }
@@ -197,11 +197,11 @@ async function openFolder(): Promise<boolean> {
     }
     state.root = handle!
     await loadModel()
-    if (state.languages.length) {
+    if (model.size) {
       setButtons({ texts: true, publish: false, gear: true })
       return true
     }
-    await new Promise<void>((resolve) => setStatus('This folder has no content/<lang>/ files.', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
+    await new Promise<void>((resolve) => setStatus('This folder has no content/ files (.md or site.yml).', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
   }
 }
 
@@ -228,12 +228,12 @@ async function boot(): Promise<void> {
   state.mode = await chooseMode()
   const ok = state.mode === 'browser' ? await openBrowser() : await openFolder()
   if (!ok) return
-  if (!state.languages.length) {
-    setStatus('No content/<lang>/ files found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
+  if (!model.size) {
+    setStatus('No content/ files (.md or site.yml) found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
     return
   }
   rememberEditor()
-  initLanguage()
+  initDir()
   bindPage()
   window.addEventListener('beforeunload', (e) => {
     if (state.savePending) {

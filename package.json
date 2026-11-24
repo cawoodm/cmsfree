@@ -1,11 +1,12 @@
 {
   "name": "cmsfree",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "scripts": {
-    "dev": "node scripts/build-example.mjs && vite",
+    "dev": "npm run build:examples && vite",
+    "dev:multilingual": "npm run build:examples && vite --mode multilingual",
     "build": "vite build",
-    "build:example": "node scripts/build-example.mjs",
+    "build:examples": "node scripts/build-site.mjs example-site && node scripts/build-site.mjs example-site-multilingual --default en",
     "preview": "node scripts/serve-static.mjs example-site/dist 4173"
   },
   "devDependencies": {

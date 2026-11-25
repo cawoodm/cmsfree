@@ -1,29 +1,25 @@
-// The model and its persistence: load the site files (content/**/blocks, i18n/*.yaml, hugo.toml) from the storage root
+// The model and its persistence: load the site files (content/blocks, i18n/*.yaml, hugo.toml) from the storage root
 // into memory, autosave changed files after 1 s, replace them after a pull, compare to the base.
 import { model, state, META_PATH } from './state'
 import type { Meta } from './state'
 import { inBatches, listFiles, readTextOrNull, removePath, writeText } from './disk'
-import { SITE_CONFIG, blobSha, isSitePath, parseDefaultLang } from './format'
+import { SITE_CONFIG, blobSha, blockFile, isSitePath, parseDefaultLang, parseLanguages } from './format'
 import { setButtons, setStatus } from './chrome'
 
 const SAVE_DELAY = 1000
 let timer: number | undefined
 let queue: Promise<void> = Promise.resolve()
 
-// Paths in the model. Multilingual site: blocks in content/<lang>/blocks/, single-language site: content/blocks/.
-// Strings are always i18n/<lang>.yaml (a single-language site uses its default language).
-export const blockPath = (lang: string, name: string) => (state.langs.length ? `content/${lang}/blocks/${name}` : `content/blocks/${name}`)
+// Paths in the model (Hugo's default layout): blocks in content/blocks/ as NAME.md (default language) or NAME.<lang>.md,
+// strings in i18n/<lang>.yaml (a single-language site uses its default language).
+export const blockPath = (lang: string, name: string) => blockFile(name, lang, state.defaultLang)
 export const stringsPath = (lang: string) => `i18n/${lang}.yaml`
 
-// Languages = folders content/<lang>/ with a blocks/ folder. Default language = defaultContentLanguage of hugo.toml.
+// Languages = the [languages.<lang>] tables of hugo.toml. Default language = its defaultContentLanguage.
 function detectSite(): void {
-  const langs = new Set<string>()
-  for (const p of model.keys()) {
-    const m = /^content\/([^/]+)\/blocks\//.exec(p)
-    if (m) langs.add(m[1])
-  }
-  state.langs = [...langs].sort()
-  state.defaultLang = parseDefaultLang(model.get(SITE_CONFIG))
+  const config = model.get(SITE_CONFIG)
+  state.langs = parseLanguages(config)
+  state.defaultLang = parseDefaultLang(config)
 }
 
 export async function loadModel(): Promise<void> {

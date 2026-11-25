@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.0 (2026-11-25)
+
+- **Hugo's default language layout.** Multilingual sites keep all blocks in `content/blocks/`: `NAME.md` in the default language, `NAME.<lang>.md` in the others (Hugo translation by file name). No per-language `contentDir` any more. The editor reads the languages from the `[languages.<lang>]` tables of `hugo.toml` and writes `HERO.de.md` on `/de/`. Breaking for multilingual sites in the 3.0 layout: move `content/<lang>/blocks/NAME.md` to `content/blocks/NAME.<lang>.md` (`NAME.md` for the default language), remove the `contentDir` lines, and copy the new `cms-block.html` / `cms-items.html` (their error now names `content/blocks/HERO.de.md`).
+
 ## 3.2.0 (2026-11-25)
 
 - The built `cms.js` starts with a version comment: `/* CMSFree v3.2.0 */`.

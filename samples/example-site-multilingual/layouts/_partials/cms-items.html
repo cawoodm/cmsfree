@@ -3,7 +3,7 @@
 {{- $name := . -}}
 {{- $path := printf "/blocks/%s" (strings.TrimSuffix ".md" $name) -}}
 {{- $p := site.GetPage $path -}}
-{{- if not $p }}{{ errorf "%s: no block %s (expected %s)" site.Language.Lang $name (cond hugo.IsMultilingual (printf "content/%s/blocks/%s" site.Language.Lang $name) (printf "content/blocks/%s" $name)) }}{{ end -}}
+{{- if not $p }}{{ errorf "%s: no block %s (expected content/blocks/%s)" site.Language.Lang $name (cond (eq site.Language.Lang site.Sites.Default.Language.Lang) $name (printf "%s.%s.md" (strings.TrimSuffix ".md" $name) site.Language.Lang)) }}{{ end -}}
 {{- $parts := split (replaceRE `(?m)^### ` "\x00### " $p.RawContent) "\x00" -}}
 {{- $items := slice -}}
 {{- range $parts }}{{ with strings.TrimSpace . }}{{ $items = $items | append (printf "<li><div>%s</div></li>" ($p.RenderString (dict "display" "block") . | strings.TrimSpace)) }}{{ end }}{{ end -}}

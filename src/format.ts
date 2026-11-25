@@ -117,18 +117,31 @@ export function setString(yamlText: string, key: string, value: string): string 
   return lines.join(eol)
 }
 
-// Files the editor loads, edits, pulls and publishes (paths relative to the site root):
-//   content/<lang>/blocks/NAME.md   blocks of a multilingual site
-//   content/blocks/NAME.md          blocks of a single-language site
+// Files the editor loads, edits, pulls and publishes (paths relative to the site root), in Hugo's default layout
+// (one content folder, translation by file name):
+//   content/blocks/NAME.md          block in the default language (or the only language)
+//   content/blocks/NAME.<lang>.md   block in another language
 //   i18n/<lang>.yaml                strings
-//   hugo.toml                       read-only: only read for defaultContentLanguage
+//   hugo.toml                       read-only: defaultContentLanguage and the [languages.<lang>] tables
 export const SITE_CONFIG = 'hugo.toml'
-export const isSitePath = (p: string) => /^content\/(?:[^/]+\/)?blocks\/[^/]+\.md$/.test(p) || /^i18n\/[^/]+\.ya?ml$/.test(p) || p === SITE_CONFIG
+export const isSitePath = (p: string) => /^content\/blocks\/[^/]+\.md$/.test(p) || /^i18n\/[^/]+\.ya?ml$/.test(p) || p === SITE_CONFIG
 
 // defaultContentLanguage of hugo.toml (Hugo's own default is "en").
 export function parseDefaultLang(toml: string | undefined): string {
   const m = /^\s*defaultContentLanguage\s*=\s*["']([^"']+)["']/m.exec(toml ?? '')
   return m ? m[1] : 'en'
+}
+
+// The languages of hugo.toml: the [languages.<lang>] tables (not deeper ones such as [languages.en.params]), sorted. [] = single-language site.
+export function parseLanguages(toml: string | undefined): string[] {
+  const langs = new Set<string>()
+  for (const m of (toml ?? '').matchAll(/^\s*\[\s*languages\.([A-Za-z0-9_-]+)\s*\]\s*$/gm)) langs.add(m[1])
+  return [...langs].sort()
+}
+
+// File of block NAME.md in a language: NAME.md in the default language, NAME.<lang>.md in the others.
+export function blockFile(name: string, lang: string, defaultLang: string): string {
+  return lang === defaultLang ? `content/blocks/${name}` : `content/blocks/${name.replace(/\.md$/, '')}.${lang}.md`
 }
 
 // Git blob SHA-1: sha1("blob " + byteLength + "\0" + utf8 bytes), as hex.

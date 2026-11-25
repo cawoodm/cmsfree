@@ -10,8 +10,8 @@ layouts/_partials/cms-block.html   shipped by cmsfree (copy from hugo/layouts/_p
 layouts/_partials/cms-items.html   shipped by cmsfree
 layouts/_partials/cms-text.html    shipped by cmsfree
 layouts/_markup/render-link.html   shipped by cmsfree: keeps tel: links (Hugo's default turns them into #ZgotmplZ)
-content/blocks/NAME.md             single-language site: Markdown blocks, no front matter
-content/<lang>/blocks/NAME.md      multilingual site: one folder per language
+content/blocks/NAME.md             Markdown block in the default (or only) language, no front matter
+content/blocks/NAME.<lang>.md      the same block in another language (Hugo: translation by file name)
 i18n/<lang>.yaml                   strings, one "key: text" line each
 static/cms.js                      the editor (copy of cmsfree dist/cms.js)
 ```
@@ -46,16 +46,16 @@ disable = true
 unsafe = true
 ```
 
-A multilingual site adds `defaultContentLanguageInSubdir = true` and one table per language:
+A multilingual site adds `defaultContentLanguageInSubdir = true` and one table per language. Keep Hugo's default layout: no `contentDir`, no `i18nDir` (the editor uses `content/` and `i18n/`).
 
 ```toml
 [languages.en]
-contentDir = "content/en"
+languageName = "English"
 [languages.de]
-contentDir = "content/de"
+languageName = "Deutsch"
 ```
 
-Do not use `--minify`: it strips the markers. The editor reads `defaultContentLanguage` from `hugo.toml` (regex, read-only; Hugo's default is `en`).
+Do not use `--minify`: it strips the markers. The editor reads `defaultContentLanguage` (Hugo's default is `en`) and the `[languages.<lang>]` table names from `hugo.toml` (regex, read-only).
 
 ## Partials
 
@@ -74,9 +74,8 @@ Language links: loop over `.AllTranslations` (see `samples/example-site-multilin
 
 ## Languages and fallback
 
-- A single-language site keeps blocks in `content/blocks/` and strings in `i18n/<defaultContentLanguage>.yaml`.
-- A multilingual site has `content/<lang>/blocks/` and `i18n/<lang>.yaml` per language, and builds `/<lang>/`.
-- Blocks have **no fallback**: every language needs every block it uses. A missing block stops the build with the expected path (`de: no block HERO.md (expected content/de/blocks/HERO.md)`).
+- Blocks live in `content/blocks/` for every site. The default language (or the only one) uses `NAME.md`, another language `NAME.<lang>.md` (`HERO.de.md`). Strings are `i18n/<lang>.yaml` per language. A multilingual site builds `/<lang>/`.
+- Blocks have **no fallback**: every language needs every block it uses. A missing block stops the build with the expected path (`de: no block HERO.md (expected content/blocks/HERO.de.md)`).
 - Strings fall back to the **default content language**: Hugo's `T` does this and it cannot be turned off. There is no other fallback (no shared root folder).
 - A string key must not be named `description`, `other`, `one` or another go-i18n message field: Hugo then reads the whole file as one message. Use `meta_description`.
 
@@ -102,12 +101,12 @@ The markers carry no language. `cms.js` takes the page language from the URL: th
 
 ## Editor rules
 
-- Files the editor loads and edits: `content/**/blocks/*.md` and `i18n/*.yaml`. `hugo.toml` is read only.
-- Languages: the folders `content/<lang>/` that contain `blocks/`. If `content/blocks/` exists instead, the site is single-language.
+- Files the editor loads and edits: `content/blocks/*.md` and `i18n/*.yaml`. `hugo.toml` is read only.
+- Languages: the `[languages.<lang>]` tables of `hugo.toml`. None = single-language site.
 - Lookup of a block: the page's language only. Lookup of a string: the page's language, then the default language (as `T`).
 - Editing a missing block creates its file in the page's language. Editing a string that came from the default language adds the key to the page's `i18n/<lang>.yaml`.
 - The Texts panel lists the blocks that have a marker on the page and the strings of the page's language plus the default language's (as placeholder).
-- Browser mode pulls and publishes `content/**`, `i18n/**` and `hugo.toml` (never changed).
+- Browser mode pulls and publishes `content/blocks/*.md`, `i18n/*.yaml` and `hugo.toml` (never changed).
 - A re-render in the browser uses `marked` (gfm) and the same items split as `cms-items.html`.
 
 ## Loader

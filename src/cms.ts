@@ -201,7 +201,7 @@ async function openFolder(): Promise<boolean> {
       setButtons({ texts: true, publish: false, gear: true })
       return true
     }
-    await new Promise<void>((resolve) => setStatus('This folder has no site files (content/…/blocks/*.md, i18n/*.yaml).', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
+    await new Promise<void>((resolve) => setStatus('This folder has no site files (content/blocks/*.md, i18n/*.yaml).', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
   }
 }
 
@@ -241,7 +241,7 @@ async function boot(): Promise<void> {
   const ok = state.mode === 'browser' ? await openBrowser() : await openFolder()
   if (!ok) return
   if (!model.size) {
-    setStatus('No site files (content/…/blocks/*.md, i18n/*.yaml) found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
+    setStatus('No site files (content/blocks/*.md, i18n/*.yaml) found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
     return
   }
   rememberEditor()

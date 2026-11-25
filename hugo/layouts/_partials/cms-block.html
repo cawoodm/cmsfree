@@ -1,7 +1,7 @@
-{{- /* cmsfree: renders the Markdown block NAME.md (content/[<lang>/]blocks/NAME.md) between edit markers.
+{{- /* cmsfree: renders the Markdown block NAME.md (content/blocks/NAME.md, or NAME.<lang>.md in a non-default language) between edit markers.
        A block missing in the page's language is a build error. Usage: {{ partial "cms-block.html" "HERO.md" }} */ -}}
 {{- $name := . -}}
 {{- $path := printf "/blocks/%s" (strings.TrimSuffix ".md" $name) -}}
 {{- $p := site.GetPage $path -}}
-{{- if not $p }}{{ errorf "%s: no block %s (expected %s)" site.Language.Lang $name (cond hugo.IsMultilingual (printf "content/%s/blocks/%s" site.Language.Lang $name) (printf "content/blocks/%s" $name)) }}{{ end -}}
+{{- if not $p }}{{ errorf "%s: no block %s (expected content/blocks/%s)" site.Language.Lang $name (cond (eq site.Language.Lang site.Sites.Default.Language.Lang) $name (printf "%s.%s.md" (strings.TrimSuffix ".md" $name) site.Language.Lang)) }}{{ end -}}
 {{- printf "<!--cms:%s-->" $name | safeHTML }}{{ $p.Content | strings.TrimSpace | safeHTML }}{{ "<!--/cms-->" | safeHTML -}}

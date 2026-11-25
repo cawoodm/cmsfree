@@ -8,15 +8,13 @@ relativeURLs = true
 disableKinds = ["section", "taxonomy", "term", "rss", "sitemap", "404"]
 
 [languages.en]
-contentDir = "content/en"
 languageName = "English"
 weight = 1
 [languages.de]
-contentDir = "content/de"
 languageName = "Deutsch"
 weight = 2
 
-# Blocks (content/<lang>/blocks/*.md) are data for the partials, not pages.
+# Blocks (content/blocks/*.md, NAME.<lang>.md for German) are data for the partials, not pages.
 [[cascade]]
 [cascade.build]
 render = "never"

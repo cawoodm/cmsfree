@@ -1,26 +1,40 @@
 # cmsfree ✎
 
-**A tiny CMS with no backend.** Edit your static site in the browser. Your edits are plain Markdown files in your site's GitHub repo; the site's own build renders and deploys them.
+**A tiny CMS with no backend.** Edit your static site in the browser. Your edits are plain Markdown files which you publish to GitHub; the site's own build renders (e.g. with Hugo) and deploys them.
 
 Add `?edit` to any page and a dormant script (`cms.js`) wakes up, loads the site's content files and turns the live page into an editor. Without `?edit` it does nothing.
 
-A site is a plain [Hugo](https://gohugo.io) site. cmsfree ships three small partials that mark the editable output; there is no custom build.
+![Edit mode: the edit bar and a pencil on each block](docs/screen1.png)
+
+![Editing a block's Markdown](docs/screen2.png)
+
+## Publishing
+
+CMSFree just writes markdown files to your github when you publish. What you do with that is up to you but you would typically have a github action which builds and publishes your HTML site.
+
+Hugo is a neat way of converting (building) that content to a website. Under `samples/` you will see 2 examples of plain [Hugo](https://gohugo.io) sites. We ships three small partials that mark the editable output and make it work.
+
+## Setup
+
+Add cms.js to your site and setup placeholders as described in our samples. Then open your site with `?edit` and click the config icon to link your github repo where your content will live:
+
+![GitHub Settings](docs/settings.png)
 
 ```
 your-site/
   hugo.toml
   layouts/home.html                  page template
   layouts/_partials/cms-*.html       cmsfree partials (hugo/layouts/_partials/)
-  content/<lang>/blocks/NAME.md      Markdown blocks (content/blocks/ for one language)
+  content/blocks/NAME.md             Markdown blocks (NAME.<lang>.md in other languages)
   i18n/<lang>.yaml                   short strings
   static/cms.js                      the cmsfree editor (this repo's dist/cms.js)
 ```
 
-A block or string missing in a language comes from the default language.
-
 See [docs/FORMAT.md](docs/FORMAT.md) for the format and the edit markers.
 
 ## Storage modes
+
+While you are editing, your content is stored in the browser by default. On desktop clients however, you can actually connect a local folder and CMSFree will write the markdown to disk. This is great for managing a local markdown library like a private wiki.
 
 - **Browser** (default): edits live in the browser (OPFS), synced with the GitHub repo. **Publish** makes one commit; your site's build deploys it.
 - **Folder** (Chromium only): pick a local clone of the site repo. Edits are written there; commit with git.

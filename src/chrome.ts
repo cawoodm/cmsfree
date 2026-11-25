@@ -49,6 +49,13 @@ const CSS = `
 .cms-dialog label .cms-field{display:flex;gap:6px;font-size:inherit;color:inherit}
 .cms-dialog .cms-field input{flex:1;min-width:0}
 .cms-dialog .cms-field .cms-btn{margin-top:4px}
+.cms-dialog h2 .cms-gh{display:inline-block;margin-left:6px;color:#59626d;vertical-align:-2px}
+.cms-dialog h2 .cms-gh:hover{color:#1b1f24}
+.cms-dialog .cms-invalid input{border-color:#dc2626;background:#fef2f2}
+.cms-dialog .cms-warn input{border-color:#d97706}
+.cms-dialog label .cms-problem{margin-top:2px;color:#dc2626}
+.cms-dialog label.cms-warn .cms-problem{color:#b45309}
+.cms-dialog p.cms-problem-note{color:#dc2626}
 .cms-dialog.cms-about{width:min(420px,92vw);text-align:center}
 .cms-dialog.cms-about h2{font-size:22px;margin-bottom:2px}
 .cms-dialog.cms-about .cms-version{font-size:12px}

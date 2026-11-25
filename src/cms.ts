@@ -14,7 +14,7 @@ import { MODE_PREFIX, model, state } from './state'
 import type { Mode, Settings } from './state'
 import { idbGetHandle, opfsSiteRoot, pickDirectory, verifyPermission } from './disk'
 import { barActions, isEditMode, isReturningEditor, rememberEditor, setButtons, setStatus, showEditLauncher, showError } from './chrome'
-import { ConflictError, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, watchBuild } from './github'
+import { ConflictError, checkSettings, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, watchBuild } from './github'
 import { changedFiles, flush, loadModel, readMeta, replaceContent, updateStatus, writeMeta } from './store'
 import { bindPage, initLang, openTexts, rangeCounts, renderAll } from './page'
 
@@ -95,7 +95,7 @@ async function pullInto(s: Settings): Promise<void> {
         setStatus(
           'Pull failed: ' + (err as Error).message,
           { label: 'Try again', onClick: resolve },
-          { label: 'Settings', onClick: () => void openSettingsDialog('', changeMode).then(() => resolve()) },
+          { label: 'Settings', onClick: () => void openSettingsDialog('', changeMode, true).then(() => resolve()) },
         ),
       )
       s = loadSettings()
@@ -103,8 +103,16 @@ async function pullInto(s: Settings): Promise<void> {
   }
 }
 
-async function openBrowser(): Promise<boolean> {
-  const s = await ensureSettings('Enter the GitHub repo of this site. The token is optional for pulling a public repo.')
+// `fromLink`: the settings just came from a setup link. They are checked on GitHub first; problems open the settings dialog.
+async function openBrowser(fromLink: boolean): Promise<boolean> {
+  let s = await ensureSettings('Enter the GitHub repo of this site. The token is optional for pulling a public repo.')
+  if (fromLink) {
+    setStatus('Checking the setup link on GitHub…')
+    if ((await checkSettings(s)).length) {
+      await openSettingsDialog('The setup link has problems (marked below). Fix them, or Save anyway.', changeMode, true)
+      s = loadSettings()
+    }
+  }
   state.root = await opfsSiteRoot(siteFolderName(s))
   void navigator.storage?.persist?.()
   state.base = await readMeta()
@@ -254,7 +262,10 @@ async function openFolder(): Promise<boolean> {
       await new Promise<void>((resolve) =>
         setStatus('Choose the local clone of the site repo (the folder that contains hugo.toml and content/).', {
           label: 'Choose folder',
-          onClick: () => void pickDirectory(state.siteKey).then((h) => ((handle = h), resolve())).catch(() => {}),
+          onClick: () =>
+            void pickDirectory(state.siteKey)
+              .then((h) => ((handle = h), resolve()))
+              .catch(() => {}),
         }),
       )
     }
@@ -264,7 +275,15 @@ async function openFolder(): Promise<boolean> {
       setButtons({ texts: true, publish: false, gear: true })
       return true
     }
-    await new Promise<void>((resolve) => setStatus('This folder has no site files (content/blocks/*.md, i18n/*.yaml).', { label: 'Choose another folder', onClick: () => void pickDirectory(state.siteKey).then(() => resolve()).catch(() => {}) }))
+    await new Promise<void>((resolve) =>
+      setStatus('This folder has no site files (content/blocks/*.md, i18n/*.yaml).', {
+        label: 'Choose another folder',
+        onClick: () =>
+          void pickDirectory(state.siteKey)
+            .then(() => resolve())
+            .catch(() => {}),
+      }),
+    )
   }
 }
 
@@ -307,9 +326,12 @@ async function boot(): Promise<void> {
   setStatus('cmsfree: starting…') // show the edit bar immediately
   state.siteKey = siteKey()
   // A setup link carries the GitHub settings; it always means browser mode.
-  if (importSetupLink()) storeMode('browser')
+  const link = importSetupLink()
+  if (link === 'imported') storeMode('browser')
+  if (link === 'invalid')
+    showError('Setup link not valid', ['The link is damaged or incomplete (owner and repository are needed), so its settings were not used.', 'Ask for a new link, or enter the settings with ⚙.'])
   state.mode = await chooseMode()
-  const ok = state.mode === 'browser' ? await openBrowser() : await openFolder()
+  const ok = state.mode === 'browser' ? await openBrowser(link === 'imported') : await openFolder()
   if (!ok) return
   if (!model.size) {
     setStatus('No site files (content/blocks/*.md, i18n/*.yaml) found in the repo.', { label: 'Re-sync', onClick: () => void resync() })

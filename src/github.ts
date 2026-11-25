@@ -35,7 +35,16 @@ export function loadSettings(): Settings {
     /* ignore malformed */
   }
   const d = detectSite()
-  return { owner: s.owner || d?.owner || '', repo: s.repo || d?.repo || '', branch: s.branch || 'main', token: s.token || '' }
+  return { owner: s.owner || d?.owner || '', repo: s.repo || d?.repo || '', branch: s.branch || 'main', subdir: normalizeSubdir(s.subdir), token: s.token || '' }
+}
+
+// " /site/ " or "site\" -> "site"; '' is the repo root.
+export function normalizeSubdir(dir: string | undefined): string {
+  return (dir || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/^\/|\/$/g, '')
 }
 
 function saveSettings(s: Settings): void {
@@ -63,7 +72,7 @@ function fromBase64Url(b64: string): string {
 export function setupLink(s: Settings): string {
   const url = new URL(location.href)
   if (!new URLSearchParams(url.search.toLowerCase()).has('edit')) url.search = url.search ? url.search + '&edit' : '?edit'
-  url.hash = LINK_PARAM + toBase64Url(JSON.stringify({ v: 1, owner: s.owner, repo: s.repo, branch: s.branch, token: s.token }))
+  url.hash = LINK_PARAM + toBase64Url(JSON.stringify({ v: 1, owner: s.owner, repo: s.repo, branch: s.branch, subdir: s.subdir, token: s.token }))
   return url.toString()
 }
 
@@ -74,7 +83,7 @@ export function importSetupLink(): boolean {
   history.replaceState(null, '', location.pathname + location.search)
   try {
     const d = JSON.parse(fromBase64Url(encoded))
-    const s: Settings = { owner: String(d.owner || ''), repo: String(d.repo || ''), branch: String(d.branch || 'main'), token: String(d.token || '') }
+    const s: Settings = { owner: String(d.owner || ''), repo: String(d.repo || ''), branch: String(d.branch || 'main'), subdir: normalizeSubdir(String(d.subdir || '')), token: String(d.token || '') }
     if (!settingsComplete(s)) return false
     saveSettings(s)
     return true
@@ -87,9 +96,9 @@ export function settingsComplete(s: Settings): boolean {
   return !!(s.owner && s.repo && s.branch)
 }
 
-// Name of the OPFS folder for this repo + branch.
+// Name of the OPFS folder for this repo + branch (+ site folder, if any).
 export function siteFolderName(s: Settings): string {
-  return [s.owner, s.repo, s.branch].map((p) => p.replace(/[^\w.-]/g, '_')).join('__')
+  return [s.owner, s.repo, s.branch, ...(s.subdir ? [s.subdir] : [])].map((p) => p.replace(/[^\w.-]/g, '_')).join('__')
 }
 
 // Resolves true when the user saved, false on cancel. `onChangeMode` adds a "change storage mode" button.
@@ -104,6 +113,7 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void): Pr
         <label>Owner <span>user or organisation</span><input name="owner"></label>
         <label>Repository<input name="repo"></label>
         <label>Branch<input name="branch"></label>
+        <label>Site folder <span>folder of the Hugo site (with hugo.toml) in the repo; empty for the repo root</span><input name="subdir" placeholder="e.g. site"></label>
         <label>Personal access token
           <span>Needs contents write access. Stored in this browser only. Optional for pulling a public repo.</span>
           <input name="token" type="password" autocomplete="off" placeholder="ghp_…"></label>
@@ -119,7 +129,7 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void): Pr
       </form>`
     const form = dlg.querySelector('form') as HTMLFormElement
     const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement
-    for (const k of ['owner', 'repo', 'branch', 'token'] as const) field(k).value = s[k]
+    for (const k of ['owner', 'repo', 'branch', 'subdir', 'token'] as const) field(k).value = s[k]
     ;(dlg.querySelector('.cms-note') as HTMLElement).textContent = note || ''
     const modeBtn = dlg.querySelector('.cms-mode') as HTMLButtonElement
     if (onChangeMode) {
@@ -127,7 +137,13 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void): Pr
       modeBtn.addEventListener('click', onChangeMode)
     }
     // Built from the fields as they are now (saved or not), shown for manual copying and copied to the clipboard.
-    const current = (): Settings => ({ owner: field('owner').value.trim(), repo: field('repo').value.trim(), branch: field('branch').value.trim() || 'main', token: field('token').value.trim() })
+    const current = (): Settings => ({
+      owner: field('owner').value.trim(),
+      repo: field('repo').value.trim(),
+      branch: field('branch').value.trim() || 'main',
+      subdir: normalizeSubdir(field('subdir').value),
+      token: field('token').value.trim(),
+    })
     dlg.querySelector('.cms-copy-link')!.addEventListener('click', () => {
       const s = current()
       const box = dlg.querySelector('.cms-link-box') as HTMLElement
@@ -181,6 +197,10 @@ export async function gh(token: string, method: string, path: string, body?: unk
 
 const repoPath = (s: Settings) => `/repos/${s.owner}/${s.repo}`
 
+// Site path <-> path in the repo: the site lives in s.subdir. null = outside the site folder.
+const toRepoPath = (s: Settings, p: string) => (s.subdir ? `${s.subdir}/${p}` : p)
+const fromRepoPath = (s: Settings, p: string) => (!s.subdir ? p : p.startsWith(s.subdir + '/') ? p.slice(s.subdir.length + 1) : null)
+
 // Decode a GitHub-API base64 payload (line-wrapped) to a UTF-8 string.
 function fromBase64(b64: string): string {
   const bin = atob(b64.replace(/\s/g, ''))
@@ -195,13 +215,16 @@ export async function getHead(s: Settings): Promise<string> {
   return ref.object.sha
 }
 
-// The site files of a commit (isSitePath: blocks, i18n strings, hugo.toml): tree sha + { path: blob sha }.
+// The site files of a commit (isSitePath: blocks, i18n strings, hugo.toml): tree sha + { site path: blob sha }.
 async function readTree(s: Settings, commit: string): Promise<{ tree: string; files: Record<string, string> }> {
   const c = await gh(s.token, 'GET', `${repoPath(s)}/git/commits/${commit}`)
   const t = await gh(s.token, 'GET', `${repoPath(s)}/git/trees/${c.tree.sha}?recursive=1`)
   if (t.truncated) throw new Error('The repo tree is too large to read through the API')
   const files: Record<string, string> = {}
-  for (const e of t.tree as { path: string; type: string; sha: string }[]) if (e.type === 'blob' && isSitePath(e.path)) files[e.path] = e.sha
+  for (const e of t.tree as { path: string; type: string; sha: string }[]) {
+    const p = e.type === 'blob' ? fromRepoPath(s, e.path) : null
+    if (p && isSitePath(p)) files[p] = e.sha
+  }
   return { tree: c.tree.sha, files }
 }
 
@@ -255,7 +278,7 @@ export async function publish(s: Settings, changed: { path: string; text: string
   const entries: { path: string; mode: '100644'; type: 'blob'; sha: string }[] = []
   for (const f of changed) {
     const blob = await gh(s.token, 'POST', `${git}/blobs`, { content: f.text, encoding: 'utf-8' })
-    entries.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha })
+    entries.push({ path: toRepoPath(s, f.path), mode: '100644', type: 'blob', sha: blob.sha })
   }
   const tree = await gh(s.token, 'POST', `${git}/trees`, { base_tree: baseTree, tree: entries })
   const names = changed.map((f) => f.path.replace(/^content\//, '')).join(', ')

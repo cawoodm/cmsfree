@@ -25,6 +25,7 @@ export interface Settings {
   owner: string
   repo: string
   branch: string
+  subdir: string // folder of the Hugo site inside the repo; '' = repo root
   token: string
 }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.1.0 (2026-11-25)
+
+- **Site folder.** The GitHub settings dialog and the setup link have a "Site folder" (`subdir`): the folder of the Hugo site (with `hugo.toml`) inside the repo, empty for the repo root. Browser mode pulls and publishes `<subdir>/content/…` and `<subdir>/i18n/…`, so a site such as `samples/example-site` in this repo can be edited.
+
 ## 4.0.0 (2026-11-25)
 
 - **Hugo's default language layout.** Multilingual sites keep all blocks in `content/blocks/`: `NAME.md` in the default language, `NAME.<lang>.md` in the others (Hugo translation by file name). No per-language `contentDir` any more. The editor reads the languages from the `[languages.<lang>]` tables of `hugo.toml` and writes `HERO.de.md` on `/de/`. Breaking for multilingual sites in the 3.0 layout: move `content/<lang>/blocks/NAME.md` to `content/blocks/NAME.<lang>.md` (`NAME.md` for the default language), remove the `contentDir` lines, and copy the new `cms-block.html` / `cms-items.html` (their error now names `content/blocks/HERO.de.md`).

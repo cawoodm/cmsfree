@@ -1,5 +1,5 @@
 {{- /* cmsfree: renders the block NAME.md split at "### " headings, one <li><div>…</div></li> per part, between edit markers.
-       A block missing in the page's language is a build error (no fallback). Usage: <ul>{{ partial "cms-items.html" "SERVICES.md" }}</ul> */ -}}
+       A block missing in the page's language is a build error. Usage: <ul>{{ partial "cms-items.html" "SERVICES.md" }}</ul> */ -}}
 {{- $name := . -}}
 {{- $path := printf "/blocks/%s" (strings.TrimSuffix ".md" $name) -}}
 {{- $p := site.GetPage $path -}}

@@ -1,5 +1,5 @@
 {{- /* cmsfree: renders the Markdown block NAME.md (content/[<lang>/]blocks/NAME.md) between edit markers.
-       A block missing in the page's language is a build error (no fallback). Usage: {{ partial "cms-block.html" "HERO.md" }} */ -}}
+       A block missing in the page's language is a build error. Usage: {{ partial "cms-block.html" "HERO.md" }} */ -}}
 {{- $name := . -}}
 {{- $path := printf "/blocks/%s" (strings.TrimSuffix ".md" $name) -}}
 {{- $p := site.GetPage $path -}}

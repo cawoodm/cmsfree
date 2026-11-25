@@ -23,6 +23,8 @@ const CSS = `
 .cms-btn.cms-primary{background:#3b82f6;border-color:#3b82f6;color:#fff}
 .cms-btn.cms-primary:hover:not(:disabled){background:#2f6fd6}
 .cms-icon{padding:6px 9px}
+.cms-btn.cms-alert{background:#d97706;border-color:#d97706;color:#fff}
+.cms-btn.cms-alert:hover:not(:disabled){background:#b45f05}
 .cms-launch{position:fixed;top:0;left:0;z-index:2147483000;width:26px;height:26px;padding:0;border:none;border-bottom-right-radius:8px;cursor:pointer;background:#22262b;color:#e8eaed;font:14px/26px system-ui,sans-serif;opacity:.35;transition:opacity .15s}
 .cms-launch:hover{opacity:1}
 .cms-overlay{position:absolute;top:0;left:0;width:0;height:0;z-index:2147482000}
@@ -44,6 +46,9 @@ const CSS = `
 .cms-dialog .cms-list{display:flex;flex-wrap:wrap;gap:6px}
 .cms-dialog [hidden]{display:none}
 .cms-dialog .cms-copy-link{margin-right:auto}
+.cms-dialog label .cms-field{display:flex;gap:6px;font-size:inherit;color:inherit}
+.cms-dialog .cms-field input{flex:1;min-width:0}
+.cms-dialog .cms-field .cms-btn{margin-top:4px}
 .cms-dialog.cms-about{width:min(420px,92vw);text-align:center}
 .cms-dialog.cms-about h2{font-size:22px;margin-bottom:2px}
 .cms-dialog.cms-about .cms-version{font-size:12px}
@@ -110,9 +115,11 @@ export function isReturningEditor(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Top edit bar:  [ status ] [ transient actions ] ........ [ Texts ] [ Publish ] [ ⚙ ] [ ? ] [ × ]
+// Top edit bar:  [ status ] [ transient actions ] ........ [ Texts ] [ ↓ ] [ ↑ ] [ ⚙ ] [ ? ] [ × ]
+// ↓ pulls from GitHub, ↑ pushes (publishes); both only in browser mode.
 // ---------------------------------------------------------------------------
 export const barActions = {
+  onPull: () => {},
   onPublish: () => {},
   onTexts: () => {},
   onSettings: () => {},
@@ -150,12 +157,13 @@ export function ensureBar(): HTMLElement {
   const spacer = document.createElement('span')
   spacer.className = 'cms-spacer'
   const texts = button('Texts', 'cms-texts', () => barActions.onTexts())
-  const publish = button('Publish', 'cms-publish cms-primary', () => barActions.onPublish())
+  const pull = button('↓', 'cms-pull cms-icon', () => barActions.onPull(), 'Pull: get the latest changes from GitHub')
+  const publish = button('↑', 'cms-publish cms-icon cms-primary', () => barActions.onPublish(), 'Push: publish your changes to GitHub')
   const gear = button('⚙', 'cms-gear cms-icon', () => barActions.onSettings(), 'GitHub settings')
   const help = button('?', 'cms-help cms-icon', showAbout, 'About cmsfree')
   const done = button('×', 'cms-done cms-icon', exitEditMode, 'Exit edit mode')
-  for (const b of [texts, publish, gear]) b.style.display = 'none'
-  bar.append(msg, actions, spacer, texts, publish, gear, help, done)
+  for (const b of [texts, pull, publish, gear]) b.style.display = 'none'
+  bar.append(msg, actions, spacer, texts, pull, publish, gear, help, done)
   document.body.prepend(bar)
   document.body.style.paddingTop = `${BAR_HEIGHT}px` // push the page down below the fixed bar
   return bar
@@ -170,15 +178,18 @@ export function setStatus(message: string, ...actions: BarAction[]): void {
   for (const a of actions) box.append(button(a.label, '', a.onClick))
 }
 
-export function setButtons(b: { texts?: boolean; publish?: boolean; publishEnabled?: boolean; gear?: boolean }): void {
+// `publish` shows or hides both ↓ and ↑ (browser mode only). `remoteChanged` highlights ↓.
+export function setButtons(b: { texts?: boolean; publish?: boolean; publishEnabled?: boolean; gear?: boolean; remoteChanged?: boolean }): void {
   const bar = ensureBar()
   const set = (sel: string, show: boolean | undefined) => {
     if (show !== undefined) (bar.querySelector(sel) as HTMLElement).style.display = show ? '' : 'none'
   }
   set('.cms-texts', b.texts)
+  set('.cms-pull', b.publish)
   set('.cms-publish', b.publish)
   set('.cms-gear', b.gear)
   if (b.publishEnabled !== undefined) (bar.querySelector('.cms-publish') as HTMLButtonElement).disabled = !b.publishEnabled
+  if (b.remoteChanged !== undefined) bar.querySelector('.cms-pull')!.classList.toggle('cms-alert', b.remoteChanged)
 }
 
 // A fresh modal <dialog> that removes itself when closed.

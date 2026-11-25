@@ -116,7 +116,7 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void): Pr
         <label>Site folder <span>folder of the Hugo site (with hugo.toml) in the repo; empty for the repo root</span><input name="subdir" placeholder="e.g. site"></label>
         <label>Personal access token
           <span>Needs contents write access. Stored in this browser only. Optional for pulling a public repo.</span>
-          <input name="token" type="password" autocomplete="off" placeholder="ghp_…"></label>
+          <span class="cms-field"><input name="token" type="password" autocomplete="off" placeholder="ghp_…"><button type="button" class="cms-btn cms-copy-token">Copy</button></span></label>
         <label class="cms-link-box" hidden>Setup link
           <span>Opens this site in edit mode with these settings, token included. Anyone with the link can publish: send it privately.</span>
           <input name="link" readonly></label>
@@ -143,6 +143,20 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void): Pr
       branch: field('branch').value.trim() || 'main',
       subdir: normalizeSubdir(field('subdir').value),
       token: field('token').value.trim(),
+    })
+    // Copies the token as typed. Without clipboard access it shows and selects the token for manual copying.
+    const copyToken = dlg.querySelector('.cms-copy-token') as HTMLButtonElement
+    copyToken.addEventListener('click', () => {
+      const token = field('token').value.trim()
+      if (!token) return
+      const reveal = () => {
+        field('token').type = 'text'
+        field('token').select()
+      }
+      navigator.clipboard?.writeText(token).then(() => {
+        copyToken.textContent = 'Copied'
+        setTimeout(() => (copyToken.textContent = 'Copy'), 1500)
+      }, reveal) ?? reveal()
     })
     dlg.querySelector('.cms-copy-link')!.addEventListener('click', () => {
       const s = current()
@@ -183,6 +197,8 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void): Pr
 export async function gh(token: string, method: string, path: string, body?: unknown): Promise<any> {
   const res = await fetch(`https://api.github.com${path}`, {
     method,
+    // GitHub sends max-age=60: a cached branch head would hide commits made in the last minute.
+    cache: 'no-store',
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       Accept: 'application/vnd.github+json',

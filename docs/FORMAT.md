@@ -136,7 +136,7 @@ The site's own build (for example GitHub Actions running Hugo) deploys it.
 
 Add `?edit` to a page URL.
 
-- **Browser mode**: edits live in the browser (OPFS). The site repo is pulled from GitHub. **Publish** makes one commit; the site's build deploys it.
+- **Browser mode**: edits live in the browser (OPFS). The site repo is pulled from GitHub. **↑ Push** makes one commit; the site's build deploys it. **↓ Pull** brings in newer commits (it turns orange when GitHub has some) and keeps your unpublished edits to files that did not change there.
 - **Folder mode** (Chromium): pick the local clone of the site repo (the folder with `hugo.toml`). Edits are written there. Commit with git.
 
 Both modes autosave 1 s after a change. The repo root must be the Hugo site root.

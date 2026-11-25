@@ -56,6 +56,7 @@ export async function replaceContent(files: Record<string, string>, meta: Meta):
   await inBatches(Object.keys(files), 8, (p) => writeText(p, files[p]))
   await writeMeta(meta)
   await loadModel()
+  state.remoteChanged = false
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,7 @@ export async function updateStatus(): Promise<void> {
     return
   }
   const n = (await changedFiles()).length
-  setStatus(state.savePending ? 'Saving…' : n ? `${n} unpublished change${n > 1 ? 's' : ''}` : 'No unpublished changes')
-  setButtons({ publishEnabled: n > 0 })
+  const local = state.savePending ? 'Saving…' : n ? `${n} unpublished change${n > 1 ? 's' : ''}` : 'No unpublished changes'
+  setStatus(state.remoteChanged ? `${local} · Newer changes on GitHub: pull them with ↓` : local)
+  setButtons({ publishEnabled: n > 0, remoteChanged: state.remoteChanged })
 }

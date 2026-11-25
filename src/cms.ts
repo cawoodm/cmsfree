@@ -5,7 +5,7 @@
 // for returning editors). In edit mode it loads the site's content and i18n files into an
 // in-memory model, binds the live page to it (pencils, editor, Texts panel) and
 // autosaves changed files to the storage root:
-//   • browser mode: OPFS, synced with the GitHub repo (pull on boot, Publish = one commit)
+//   • browser mode: OPFS, synced with the GitHub repo (↓ pull, ↑ push = one commit; remote changes are flagged)
 //   • folder mode:  a local clone picked with the File System Access API
 //
 // This entry module wires the pieces together; each concern lives in its own
@@ -118,13 +118,73 @@ async function openBrowser(): Promise<boolean> {
     } catch {
       /* offline or rate limited: keep working on the local copy */
     }
+    // Nothing unpublished: take the new state silently. Otherwise flag it; ↓ merges when the user is ready.
     if (head && head !== state.base.commit) {
       if ((await changedFiles()).length === 0) await pullInto(s)
-      else if (confirm('The site changed on GitHub and you have unpublished changes.\n\nOK discards your local changes and re-syncs.\nCancel keeps them (Publish merges if the files do not overlap).')) await pullInto(s)
+      else state.remoteChanged = true
     }
   }
   setButtons({ texts: true, publish: true, gear: true })
   return true
+}
+
+let busy = false // a pull or publish is running: the remote check waits
+let lastCheck = 0
+
+// Flags new commits on the branch (highlighted ↓ plus a status note). Errors (offline, rate limit) are ignored.
+async function checkRemote(): Promise<void> {
+  if (state.mode !== 'browser' || !state.base || busy || document.hidden) return
+  lastCheck = Date.now()
+  try {
+    const moved = (await getHead(loadSettings())) !== state.base.commit
+    if (moved !== state.remoteChanged && !busy) {
+      state.remoteChanged = moved
+      await updateStatus()
+    }
+  } catch {
+    /* keep the last known state */
+  }
+}
+
+// Every minute with a token (5000 API calls/h), every 5 minutes without (60/h), and when the tab becomes visible again.
+function watchRemote(): void {
+  window.setInterval(() => void checkRemote(), loadSettings().token ? 60_000 : 300_000)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && Date.now() - lastCheck > 30_000) void checkRemote()
+  })
+}
+
+// ↓ Pull: take GitHub's latest files. Unpublished edits to files GitHub did not change are kept;
+// a file changed both here and on GitHub asks first (OK takes GitHub's version, Cancel stops the pull).
+async function runPull(): Promise<void> {
+  if (busy) return
+  busy = true
+  try {
+    await flush()
+    setStatus('Pulling the site from GitHub…')
+    let remote: Awaited<ReturnType<typeof pull>>
+    try {
+      remote = await pull(loadSettings())
+    } catch (err) {
+      setStatus('Pull failed: ' + (err as Error).message, { label: 'Try again', onClick: () => void runPull() })
+      return
+    }
+    const local = await changedFiles()
+    const base = state.base?.files ?? {}
+    const both = local.filter((f) => remote.meta.files[f.path] !== base[f.path]).map((f) => f.path)
+    if (both.length && !confirm(`These files changed here and on GitHub:\n\n${both.join('\n')}\n\nOK takes the GitHub version (your edits to these files are lost).\nCancel stops the pull.`)) {
+      await updateStatus()
+      return
+    }
+    const files = { ...remote.files }
+    for (const f of local) if (!both.includes(f.path)) files[f.path] = f.text
+    await replaceContent(files, remote.meta)
+    initLang()
+    renderAll()
+    await updateStatus()
+  } finally {
+    busy = false
+  }
 }
 
 async function resync(): Promise<void> {
@@ -150,6 +210,7 @@ async function runPublish(): Promise<void> {
   stopWatch?.()
   setStatus('Publishing…')
   setButtons({ publishEnabled: false })
+  busy = true
   try {
     const res = await publish(s, changed, state.base!)
     await writeMeta(res.meta)
@@ -166,9 +227,11 @@ async function runPublish(): Promise<void> {
       else setStatus('Published. No build result yet.')
     })
   } catch (err) {
-    if (err instanceof ConflictError) setStatus(err.message, { label: 'Re-sync (discard my changes)', onClick: () => void resync() })
+    if (err instanceof ConflictError) setStatus(err.message, { label: 'Pull', onClick: () => void runPull() })
     else setStatus('Publish failed: ' + (err as Error).message, { label: 'Try again', onClick: () => void runPublish() })
     setButtons({ publishEnabled: true })
+  } finally {
+    busy = false
   }
 }
 
@@ -208,11 +271,19 @@ async function openFolder(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
+barActions.onPull = () => void runPull()
 barActions.onPublish = () => void runPublish()
 barActions.onTexts = () => openTexts()
 barActions.onSettings = () => {
-  if (state.mode === 'browser') void openSettingsDialog('', changeMode)
-  else if (confirm('Forget this folder and choose the storage mode again?')) changeMode()
+  if (state.mode === 'browser') {
+    // Another repo, branch or site folder means another local copy: reload to load it.
+    const before = siteFolderName(loadSettings())
+    void openSettingsDialog('', changeMode).then(async (saved) => {
+      if (!saved || siteFolderName(loadSettings()) === before) return
+      await flush()
+      location.reload()
+    })
+  } else if (confirm('Forget this folder and choose the storage mode again?')) changeMode()
 }
 
 // The site files loaded, but the page has no block markers, so there are no pencils to click.
@@ -255,6 +326,7 @@ async function boot(): Promise<void> {
     }
   })
   await updateStatus()
+  if (state.mode === 'browser') watchRemote()
 }
 
 if (document.readyState === 'loading') {

@@ -49,4 +49,5 @@ export const state = {
   base: null as Meta | null,
   dirty: new Set<string>(), // model paths not yet written to storage
   savePending: false,
+  remoteChanged: false, // browser mode: the branch on GitHub has commits that are not pulled yet
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.2.0 (2026-11-25)
+
+- **↓ Pull and ↑ Push** in the edit bar (browser mode) replace the Publish button. ↓ brings in newer commits from GitHub and keeps unpublished edits to files GitHub did not change; a file changed on both sides asks first.
+- **Remote changes are flagged.** The editor checks the branch every minute (every 5 minutes without a token) and when the tab gets focus. New commits turn ↓ orange and add a note to the status line. On boot with unpublished edits it flags instead of asking to discard them.
+- **Copy the token** from the GitHub settings dialog (Copy button next to the field).
+- Saving another repo, branch or site folder in the settings reloads the editor, so it pulls that site.
+
+### Fixed
+
+- Re-sync and pull could get an old branch head for up to a minute (the browser cached GitHub's `max-age=60` response) and so showed old content. API calls now bypass the cache.
+
 ## 4.1.0 (2026-11-25)
 
 - **Site folder.** The GitHub settings dialog and the setup link have a "Site folder" (`subdir`): the folder of the Hugo site (with `hugo.toml`) inside the repo, empty for the repo root. Browser mode pulls and publishes `<subdir>/content/…` and `<subdir>/i18n/…`, so a site such as `samples/example-site` in this repo can be edited.

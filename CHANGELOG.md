@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.0.0 (2026-11-25)
+
+- **Breaking: folder mode is gone.** Edits always live in the browser (OPFS) and go to GitHub with ↑ Push. The "Where should your edits live?" prompt, the local-folder picker and the "Change storage mode" button are removed; a stored folder choice is ignored. Working on a local clone: edit the Markdown files directly and commit with git.
+- **Download .zip** in the settings dialog: the site files as they are in this browser, unpublished edits included, at their repo paths (unpacks over the root of a clone). Built in (about 1.7 KB), no library.
+
 ## 4.3.0 (2026-11-25)
 
 - **Settings are checked on GitHub.** Save (and opening a setup link) checks owner, repository, token, branch and site folder; a problem marks its field red (amber for a warning such as "no blocks" or a read-only token) with the reason, and Save becomes "Save anyway". A wrong site folder names the folders that have a `hugo.toml`. A damaged setup link says so. The dialog title has a GitHub icon linking to the repo folder.

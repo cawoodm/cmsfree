@@ -32,12 +32,9 @@ your-site/
 
 See [docs/FORMAT.md](docs/FORMAT.md) for the format and the edit markers.
 
-## Storage modes
+## Storage
 
-While you are editing, your content is stored in the browser by default. On desktop clients however, you can actually connect a local folder and CMSFree will write the markdown to disk. This is great for managing a local markdown library like a private wiki.
-
-- **Browser** (default): edits live in the browser (OPFS), synced with the GitHub repo. **Publish** makes one commit; your site's build deploys it.
-- **Folder** (Chromium only): pick a local clone of the site repo. Edits are written there; commit with git.
+While you are editing, your content is stored in the browser (OPFS) and synced with the GitHub repo. **↑ Push** makes one commit; your site's build deploys it. **↓ Pull** brings in newer commits. To get the files out without GitHub, use **Download .zip** in the settings (⚙): the site files as they are in the browser, unpublished edits included.
 
 ## Try the example
 
@@ -47,7 +44,7 @@ npm run dev                  # renders both examples, serves samples/example-sit
 npm run dev:multilingual     # serves samples/example-site-multilingual (/en/, /de/)
 ```
 
-Open **http://localhost:5173/?edit** (multilingual: **/en/?edit**) and choose **Use local folder**, then pick `samples/example-site/` (or `samples/example-site-multilingual/`). Edits are written to its `content/` and `i18n/`; run `npm run build:examples` to render them.
+Open **http://localhost:5173/?edit** (multilingual: **/en/?edit**) and enter a GitHub repo in the settings: for example owner `cawoodm`, repository `cmsfree`, Site folder `samples/example-site` (no token needed to pull a public repo; pushing needs one with write access).
 
 ```bash
 npm run build          # bundle the editor -> dist/cms.js (copy it to a site's static/cms.js)

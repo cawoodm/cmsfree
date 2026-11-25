@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 cmsfree is a backend-less editor for static sites that are plain Hugo sites (format: `docs/FORMAT.md`). The whole engine compiles to a single self-contained `cms.js` "sleeper" that a site loads on every page but that stays **dormant** until the URL carries `?edit`. In edit mode it loads the site's `content/blocks/*.md` and `i18n/*.yaml` into memory, binds the live page to them (edit pencils, editor dialog, Texts panel) and autosaves. The site's own build (Hugo, e.g. in GitHub Actions) renders and deploys; cmsfree is only the editor.
 
-**Requirements:** Node.js and Hugo 0.147+ on the PATH (for the examples). Folder mode needs a Chromium browser (File System Access API); browser mode works elsewhere.
+**Requirements:** Node.js and Hugo 0.147+ on the PATH (for the examples). The editor needs a browser with OPFS and `CompressionStream` (all current browsers).
 
 ## Commands
 
@@ -23,18 +23,17 @@ There is no test framework and no lint/format script. Formatting is `.prettierrc
 
 A Hugo site: `layouts/home.html` uses three partials shipped in `hugo/layouts/_partials/` (`cms-block.html`, `cms-items.html`, `cms-text.html`; sites keep a copy). The site keeps Hugo's default layout (no `contentDir`/`i18nDir`): blocks are `content/blocks/NAME.md` in the default (or only) language and `content/blocks/NAME.<lang>.md` in another (Hugo translation by file name), strings are `i18n/<lang>.yaml`. Blocks have no fallback: a block missing in a page's language fails the build (`errorf` in the partials). A string missing in a page's language comes from the default content language (`defaultContentLanguage` in `hugo.toml`), because Hugo's `T` does that; there is no other fallback. The partials wrap editable output in comments: `<!--cms:KEY-->…<!--/cms-->` (KEY is `NAME.md`, `NAME.md:items` or a string key). Blocks are always wrapped; strings only where `cms-text` is used (text context; `{{ T "key" }}` in attributes/`<title>` has no marker). `cms.js` finds these ranges on the live page. Rules: `docs/FORMAT.md`.
 
-`src/format.ts` is **pure** (no DOM, no FSA): marked rendering, `renderItems`, marker helpers, the small i18n yaml parser, `setString` (replaces a key's line in place), `isSitePath` (the editable file set) and `parseDefaultLang`. Its output must stay identical to the partials' Hugo output: `new Marked({ gfm: true })`, `parse().trim()`, same `### ` split, same `escapeHtml`.
+`src/format.ts` is **pure** (no DOM, no storage): marked rendering, `renderItems`, marker helpers, the small i18n yaml parser, `setString` (replaces a key's line in place), `isSitePath` (the editable file set) and `parseDefaultLang`. Its output must stay identical to the partials' Hugo output: `new Marked({ gfm: true })`, `parse().trim()`, same `### ` split, same `escapeHtml`.
 
-### Modes and storage
+### Storage
 
-Chosen once per site (localStorage `cmsfree:mode:<siteKey>`). Without `showDirectoryPicker` it is always browser mode.
+The browser is the only storage (5.0 removed folder mode and its File System Access / IndexedDB code). OPFS `sites/<owner>__<repo>__<branch>/` holds the site files (`content/blocks/*.md`, `i18n/*.yaml`, `hugo.toml`) and `.cmsfree/meta.json` (the **base**: `{commit, tree, files: {path: blobSha}}` from the last pull/publish). Boot: no meta -> pull; else if the branch head differs from the base commit -> pull silently when nothing is unpublished, otherwise set `state.remoteChanged` (orange ↓ plus a status note). `checkRemote` in `cms.ts` polls the head every 60 s with a token (5 min without) and on tab focus. **Pull** (↓, `runPull`): fetch the head; unpublished edits to files GitHub did not change are kept, a file changed on both sides asks (`confirm()`: take GitHub's version or cancel). `gh()` fetches with `cache: 'no-store'` (GitHub sends max-age=60). Pull replaces the local site files entirely. Only `isSitePath` files are pulled, compared and published; `hugo.toml` is never changed. **Push** (↑, `runPublish` in `cms.ts`): flush, changed = files whose git blob SHA differs from the base; if the head moved, a changed path whose head SHA differs from the base SHA is a conflict; otherwise blobs -> tree (`base_tree`) -> commit -> `PATCH ref` with `force:false`; update meta; poll `actions/runs?head_sha=` every 5 s. The Hugo site can sit in a repo folder (setting `subdir`, "Site folder"): `github.ts` maps repo paths `<subdir>/<site path>` to site paths on read and back on publish, so OPFS, the model and meta only hold site paths. A non-empty subdir is appended to the OPFS folder name.
 
-- **Browser mode:** OPFS `sites/<owner>__<repo>__<branch>/` holds the site files (`content/blocks/*.md`, `i18n/*.yaml`, `hugo.toml`) and `.cmsfree/meta.json` (the **base**: `{commit, tree, files: {path: blobSha}}` from the last pull/publish). Boot: no meta -> pull; else if the branch head differs from the base commit -> pull silently when nothing is unpublished, otherwise set `state.remoteChanged` (orange ↓ plus a status note). `checkRemote` in `cms.ts` polls the head every 60 s with a token (5 min without) and on tab focus. **Pull** (↓, `runPull`): fetch the head; unpublished edits to files GitHub did not change are kept, a file changed on both sides asks (`confirm()`: take GitHub's version or cancel). `gh()` fetches with `cache: 'no-store'` (GitHub sends max-age=60). Pull replaces the local site files entirely. Only `isSitePath` files are pulled, compared and published; `hugo.toml` is never changed. **Push** (↑, `runPublish` in `cms.ts`): flush, changed = files whose git blob SHA differs from the base; if the head moved, a changed path whose head SHA differs from the base SHA is a conflict; otherwise blobs -> tree (`base_tree`) -> commit -> `PATCH ref` with `force:false`; update meta; poll `actions/runs?head_sha=` every 5 s. The Hugo site can sit in a repo folder (setting `subdir`, "Site folder"): `github.ts` maps repo paths `<subdir>/<site path>` to site paths on read and back on publish, so OPFS, the model and meta only hold site paths. A non-empty subdir is appended to the OPFS folder name.
-- **Folder mode:** a local clone of the site repo (the Hugo site root, with `hugo.toml`) picked via FSA; the handle is kept in IndexedDB (permission is re-granted by a user gesture). Autosave writes there. No ↓ / ↑ buttons.
+**Download .zip** (settings dialog, `downloadZip` in `cms.ts`, writer in `zip.ts`): flush, then the model files at their repo paths (`toRepoPath`, so it unpacks over a clone), unpublished edits included, `.cmsfree/meta.json` left out; deflate via `CompressionStream('deflate-raw')`, no library.
 
 Site identity: owner/repo are detected on `*.github.io`, otherwise set in the settings dialog. Settings (owner, repo, branch, subdir, token) live in localStorage `cmsfree:github:<host[/repo]>`. `checkSettings` (`github.ts`) checks them on GitHub (repo, token, branch, `hugo.toml` in the site folder, blocks) when the dialog saves and when a setup link is opened; problems mark the dialog fields. A pull without `hugo.toml` in the site folder fails (`NoSiteError`) instead of returning nothing.
 
-Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of owner, repo, branch, subdir, token>` ("Copy setup link"). On boot `importSetupLink()` stores those settings for the site, forces browser mode and strips the fragment from the address bar and history. The fragment never reaches a server, but base64 is not encryption: the link is as secret as the token.
+Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of owner, repo, branch, subdir, token>` ("Copy setup link"). On boot `importSetupLink()` stores those settings for the site, checks them on GitHub (problems open the settings dialog) and strips the fragment from the address bar and history. The fragment never reaches a server, but base64 is not encryption: the link is as secret as the token.
 
 ### Editing on the page
 
@@ -43,13 +42,14 @@ Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of o
 ### Module boundaries
 
 - `state.ts` imports nothing: shared singleton, model `Map<path, text>`, types, constants.
-- `disk.ts`: IndexedDB handle store, OPFS root, raw read/write/list/remove relative to `state.root`.
+- `disk.ts`: OPFS root, raw read/write/list/remove relative to `state.root`.
+- `zip.ts`: .zip writer + download (no storage access).
 - `format.ts`: pure (above).
 - `store.ts`: load model, language detection, file paths, autosave, base comparison, status line.
 - `github.ts`: settings + dialog, `gh()`, pull, publish, build polling. No storage access; callers pass data in and out.
 - `page.ts`: marker ranges, pencils, editor, Texts panel, re-render.
 - `chrome.ts`: injected `cms-` CSS (sites ship no cms CSS), bar, dialog helper, launcher, edit-mode entry/exit. It gets its button handlers through the injected `barActions` object so it never imports store/github/page.
-- `cms.ts`: boot and wiring (mode choice, pull/resync, publish).
+- `cms.ts`: boot and wiring (settings, pull/resync, publish, zip download).
 
 ## Code style
 

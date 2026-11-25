@@ -4,80 +4,31 @@
 // Dormant unless the URL carries `?edit` (view mode only shows a re-entry pencil
 // for returning editors). In edit mode it loads the site's content and i18n files into an
 // in-memory model, binds the live page to it (pencils, editor, Texts panel) and
-// autosaves changed files to the storage root:
-//   • browser mode: OPFS, synced with the GitHub repo (↓ pull, ↑ push = one commit; remote changes are flagged)
-//   • folder mode:  a local clone picked with the File System Access API
+// autosaves changed files to the browser (OPFS), synced with the GitHub repo
+// (↓ pull, ↑ push = one commit; remote changes are flagged). ⚙ can download the files as a .zip.
 //
 // This entry module wires the pieces together; each concern lives in its own
 // module (state, disk, format, store, github, page, chrome).
-import { MODE_PREFIX, model, state } from './state'
-import type { Mode, Settings } from './state'
-import { idbGetHandle, opfsSiteRoot, pickDirectory, verifyPermission } from './disk'
+import { model, state } from './state'
+import type { Settings } from './state'
+import { opfsSiteRoot } from './disk'
 import { barActions, isEditMode, isReturningEditor, rememberEditor, setButtons, setStatus, showEditLauncher, showError } from './chrome'
-import { ConflictError, checkSettings, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, watchBuild } from './github'
+import { ConflictError, checkSettings, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, toRepoPath, watchBuild } from './github'
+import { download, zip } from './zip'
 import { changedFiles, flush, loadModel, readMeta, replaceContent, updateStatus, writeMeta } from './store'
 import { bindPage, initLang, openTexts, rangeCounts, renderAll } from './page'
 
 let stopWatch: (() => void) | null = null
 
 // ---------------------------------------------------------------------------
-// Mode
-// ---------------------------------------------------------------------------
-const modeKey = () => MODE_PREFIX + state.siteKey
-
-function storedMode(): Mode | null {
-  try {
-    const m = localStorage.getItem(modeKey())
-    return m === 'browser' || m === 'folder' ? m : null
-  } catch {
-    return null
-  }
-}
-
-function storeMode(mode: Mode): void {
-  try {
-    localStorage.setItem(modeKey(), mode)
-  } catch {
-    /* storage blocked: ask again next time */
-  }
-}
-
-// Forget the stored mode and boot again, which asks anew.
-function changeMode(): void {
-  try {
-    localStorage.removeItem(modeKey())
-  } catch {
-    /* ignore */
-  }
-  location.reload()
-}
-
-// Chosen once per site. Without the File System Access API only browser mode exists.
-async function chooseMode(): Promise<Mode> {
-  const stored = storedMode()
-  if (stored && (stored === 'browser' || 'showDirectoryPicker' in window)) return stored
-  if (!('showDirectoryPicker' in window)) {
-    storeMode('browser')
-    return 'browser'
-  }
-  return new Promise((resolve) => {
-    const pick = (m: Mode) => () => {
-      storeMode(m)
-      resolve(m)
-    }
-    setStatus('Where should your edits live?', { label: 'Edit in browser', onClick: pick('browser') }, { label: 'Use local folder', onClick: pick('folder') })
-  })
-}
-
-// ---------------------------------------------------------------------------
-// Browser mode
+// Open the site
 // ---------------------------------------------------------------------------
 // Settings must be complete before anything else. Cancelling waits for the user to try again.
 async function ensureSettings(note: string): Promise<Settings> {
   for (;;) {
     const s = loadSettings()
     if (settingsComplete(s)) return s
-    const saved = await openSettingsDialog(note, changeMode)
+    const saved = await openSettingsDialog(note)
     if (!saved) await new Promise<void>((resolve) => setStatus('GitHub settings are needed to load the site.', { label: 'Open settings', onClick: resolve }))
   }
 }
@@ -92,11 +43,7 @@ async function pullInto(s: Settings): Promise<void> {
       return
     } catch (err) {
       await new Promise<void>((resolve) =>
-        setStatus(
-          'Pull failed: ' + (err as Error).message,
-          { label: 'Try again', onClick: resolve },
-          { label: 'Settings', onClick: () => void openSettingsDialog('', changeMode, true).then(() => resolve()) },
-        ),
+        setStatus('Pull failed: ' + (err as Error).message, { label: 'Try again', onClick: resolve }, { label: 'Settings', onClick: () => void openSettingsDialog('', true).then(() => resolve()) }),
       )
       s = loadSettings()
     }
@@ -104,12 +51,12 @@ async function pullInto(s: Settings): Promise<void> {
 }
 
 // `fromLink`: the settings just came from a setup link. They are checked on GitHub first; problems open the settings dialog.
-async function openBrowser(fromLink: boolean): Promise<boolean> {
+async function openSite(fromLink: boolean): Promise<void> {
   let s = await ensureSettings('Enter the GitHub repo of this site. The token is optional for pulling a public repo.')
   if (fromLink) {
     setStatus('Checking the setup link on GitHub…')
     if ((await checkSettings(s)).length) {
-      await openSettingsDialog('The setup link has problems (marked below). Fix them, or Save anyway.', changeMode, true)
+      await openSettingsDialog('The setup link has problems (marked below). Fix them, or Save anyway.', true)
       s = loadSettings()
     }
   }
@@ -133,7 +80,6 @@ async function openBrowser(fromLink: boolean): Promise<boolean> {
     }
   }
   setButtons({ texts: true, publish: true, gear: true })
-  return true
 }
 
 let busy = false // a pull or publish is running: the remote check waits
@@ -141,7 +87,7 @@ let lastCheck = 0
 
 // Flags new commits on the branch (highlighted ↓ plus a status note). Errors (offline, rate limit) are ignored.
 async function checkRemote(): Promise<void> {
-  if (state.mode !== 'browser' || !state.base || busy || document.hidden) return
+  if (!state.base || busy || document.hidden) return
   lastCheck = Date.now()
   try {
     const moved = (await getHead(loadSettings())) !== state.base.commit
@@ -205,7 +151,7 @@ async function resync(): Promise<void> {
 async function runPublish(): Promise<void> {
   let s = loadSettings()
   if (!s.token) {
-    const saved = await openSettingsDialog('Publishing needs a token with contents write access.', changeMode)
+    const saved = await openSettingsDialog('Publishing needs a token with contents write access.')
     s = loadSettings()
     if (!saved || !s.token) return
   }
@@ -244,65 +190,29 @@ async function runPublish(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Folder mode
-// ---------------------------------------------------------------------------
-// Gets a usable folder handle: restore the stored one (a user gesture re-grants permission) or pick one.
-async function openFolder(): Promise<boolean> {
-  for (;;) {
-    let handle = await idbGetHandle(state.siteKey)
-    if (handle && !(await verifyPermission(handle, false))) {
-      const h = handle
-      const granted = await new Promise<boolean>((resolve) => setStatus('Reconnect to continue editing.', { label: 'Reconnect', onClick: () => void verifyPermission(h, true).then(resolve) }))
-      if (!granted) {
-        setStatus('Permission denied. Editing needs folder access.', { label: 'Try again', onClick: () => location.reload() })
-        return false
-      }
-    }
-    if (!handle) {
-      await new Promise<void>((resolve) =>
-        setStatus('Choose the local clone of the site repo (the folder that contains hugo.toml and content/).', {
-          label: 'Choose folder',
-          onClick: () =>
-            void pickDirectory(state.siteKey)
-              .then((h) => ((handle = h), resolve()))
-              .catch(() => {}),
-        }),
-      )
-    }
-    state.root = handle!
-    await loadModel()
-    if (model.size) {
-      setButtons({ texts: true, publish: false, gear: true })
-      return true
-    }
-    await new Promise<void>((resolve) =>
-      setStatus('This folder has no site files (content/blocks/*.md, i18n/*.yaml).', {
-        label: 'Choose another folder',
-        onClick: () =>
-          void pickDirectory(state.siteKey)
-            .then(() => resolve())
-            .catch(() => {}),
-      }),
-    )
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 barActions.onPull = () => void runPull()
 barActions.onPublish = () => void runPublish()
 barActions.onTexts = () => openTexts()
 barActions.onSettings = () => {
-  if (state.mode === 'browser') {
-    // Another repo, branch or site folder means another local copy: reload to load it.
-    const before = siteFolderName(loadSettings())
-    void openSettingsDialog('', changeMode).then(async (saved) => {
-      if (!saved || siteFolderName(loadSettings()) === before) return
-      await flush()
-      location.reload()
-    })
-  } else if (confirm('Forget this folder and choose the storage mode again?')) changeMode()
+  // Another repo, branch or site folder means another local copy: reload to load it.
+  const before = siteFolderName(loadSettings())
+  void openSettingsDialog('', false, () => void downloadZip()).then(async (saved) => {
+    if (!saved || siteFolderName(loadSettings()) === before) return
+    await flush()
+    location.reload()
+  })
+}
+
+// Download .zip: the site files as they are in this browser (unpublished edits included) at their repo paths,
+// so the archive unpacks over the root of a clone. .cmsfree/meta.json stays out.
+async function downloadZip(): Promise<void> {
+  await flush()
+  const s = loadSettings()
+  const files: Record<string, string> = {}
+  for (const [path, text] of model) files[toRepoPath(s, path)] = text
+  download(await zip(files), `${s.repo}-${s.branch}-${new Date().toISOString().slice(0, 10)}.zip`)
 }
 
 // The site files loaded, but the page has no block markers, so there are no pencils to click.
@@ -325,14 +235,11 @@ async function boot(): Promise<void> {
   }
   setStatus('cmsfree: starting…') // show the edit bar immediately
   state.siteKey = siteKey()
-  // A setup link carries the GitHub settings; it always means browser mode.
+  // A setup link carries the GitHub settings.
   const link = importSetupLink()
-  if (link === 'imported') storeMode('browser')
   if (link === 'invalid')
     showError('Setup link not valid', ['The link is damaged or incomplete (owner and repository are needed), so its settings were not used.', 'Ask for a new link, or enter the settings with ⚙.'])
-  state.mode = await chooseMode()
-  const ok = state.mode === 'browser' ? await openBrowser(link === 'imported') : await openFolder()
-  if (!ok) return
+  await openSite(link === 'imported')
   if (!model.size) {
     setStatus('No site files (content/blocks/*.md, i18n/*.yaml) found in the repo.', { label: 'Re-sync', onClick: () => void resync() })
     return
@@ -348,7 +255,7 @@ async function boot(): Promise<void> {
     }
   })
   await updateStatus()
-  if (state.mode === 'browser') watchRemote()
+  watchRemote()
 }
 
 if (document.readyState === 'loading') {

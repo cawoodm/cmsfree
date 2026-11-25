@@ -109,10 +109,10 @@ export function githubUrl(s: Settings): string {
 
 const GITHUB_ICON = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>`
 
-// Resolves true when the user saved, false on cancel. `onChangeMode` adds a "change storage mode" button.
+// Resolves true when the user saved, false on cancel. `onDownload` adds a "Download .zip" button.
 // Save first checks the settings on GitHub (checkSettings): problems mark their fields red (error) or amber
 // (warning) and Save becomes "Save anyway". `check` runs the check as soon as the dialog opens.
-export function openSettingsDialog(note?: string, onChangeMode?: () => void, check = false): Promise<boolean> {
+export function openSettingsDialog(note?: string, check = false, onDownload?: () => void): Promise<boolean> {
   return new Promise((resolve) => {
     const s = loadSettings()
     const dlg = dialog()
@@ -132,7 +132,7 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void, che
           <input name="link" readonly></label>
         <div class="cms-row">
           <button type="button" class="cms-btn cms-copy-link">Copy setup link</button>
-          <button type="button" class="cms-btn cms-mode" hidden>Change storage mode</button>
+          <button type="button" class="cms-btn cms-download" hidden title="The site files in this browser, unpublished edits included">Download .zip</button>
           <button value="cancel" class="cms-btn" type="submit">Cancel</button>
           <button value="save" class="cms-btn cms-primary cms-save" type="submit">Save</button>
         </div>
@@ -141,10 +141,10 @@ export function openSettingsDialog(note?: string, onChangeMode?: () => void, che
     const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement
     for (const k of ['owner', 'repo', 'branch', 'subdir', 'token'] as const) field(k).value = s[k]
     ;(dlg.querySelector('.cms-note') as HTMLElement).textContent = note || ''
-    const modeBtn = dlg.querySelector('.cms-mode') as HTMLButtonElement
-    if (onChangeMode) {
-      modeBtn.hidden = false
-      modeBtn.addEventListener('click', onChangeMode)
+    const downloadBtn = dlg.querySelector('.cms-download') as HTMLButtonElement
+    if (onDownload) {
+      downloadBtn.hidden = false
+      downloadBtn.addEventListener('click', onDownload)
     }
     // Built from the fields as they are now (saved or not), shown for manual copying and copied to the clipboard.
     const current = (): Settings => ({
@@ -295,7 +295,7 @@ export async function gh(token: string, method: string, path: string, body?: unk
 const repoPath = (s: Settings) => `/repos/${s.owner}/${s.repo}`
 
 // Site path <-> path in the repo: the site lives in s.subdir. null = outside the site folder.
-const toRepoPath = (s: Settings, p: string) => (s.subdir ? `${s.subdir}/${p}` : p)
+export const toRepoPath = (s: Settings, p: string) => (s.subdir ? `${s.subdir}/${p}` : p)
 const fromRepoPath = (s: Settings, p: string) => (!s.subdir ? p : p.startsWith(s.subdir + '/') ? p.slice(s.subdir.length + 1) : null)
 
 // Decode a GitHub-API base64 payload (line-wrapped) to a UTF-8 string.

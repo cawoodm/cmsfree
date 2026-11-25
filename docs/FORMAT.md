@@ -106,7 +106,7 @@ The markers carry no language. `cms.js` takes the page language from the URL: th
 - Lookup of a block: the page's language only. Lookup of a string: the page's language, then the default language (as `T`).
 - Editing a missing block creates its file in the page's language. Editing a string that came from the default language adds the key to the page's `i18n/<lang>.yaml`.
 - The Texts panel lists the blocks that have a marker on the page and the strings of the page's language plus the default language's (as placeholder).
-- Browser mode pulls and publishes `content/blocks/*.md`, `i18n/*.yaml` and `hugo.toml` (never changed).
+- The editor pulls and publishes `content/blocks/*.md`, `i18n/*.yaml` and `hugo.toml` (never changed).
 - A re-render in the browser uses `marked` (gfm) and the same items split as `cms-items.html`.
 
 ## Loader
@@ -136,7 +136,4 @@ The site's own build (for example GitHub Actions running Hugo) deploys it.
 
 Add `?edit` to a page URL.
 
-- **Browser mode**: edits live in the browser (OPFS). The site repo is pulled from GitHub. **↑ Push** makes one commit; the site's build deploys it. **↓ Pull** brings in newer commits (it turns orange when GitHub has some) and keeps your unpublished edits to files that did not change there.
-- **Folder mode** (Chromium): pick the local clone of the site repo (the folder with `hugo.toml`). Edits are written there. Commit with git.
-
-Both modes autosave 1 s after a change. The repo root must be the Hugo site root.
+Edits live in the browser (OPFS) and autosave 1 s after a change. The site repo is pulled from GitHub. **↑ Push** makes one commit; the site's build deploys it. **↓ Pull** brings in newer commits (it turns orange when GitHub has some) and keeps your unpublished edits to files that did not change there. **Download .zip** (⚙) saves the site files as they are in the browser, unpublished edits included, at their repo paths. The Hugo site is the repo root or the "Site folder" set in ⚙.

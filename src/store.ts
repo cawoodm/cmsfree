@@ -102,12 +102,8 @@ export async function changedFiles(): Promise<{ path: string; text: string; sha:
   return out
 }
 
-// Status line: unpublished changes (browser mode) or the folder save state (folder mode).
+// Status line: unpublished changes, plus a note when GitHub has newer commits.
 export async function updateStatus(): Promise<void> {
-  if (state.mode === 'folder') {
-    setStatus(state.savePending ? 'Saving…' : 'Saved to folder')
-    return
-  }
   const n = (await changedFiles()).length
   const local = state.savePending ? 'Saving…' : n ? `${n} unpublished change${n > 1 ? 's' : ''}` : 'No unpublished changes'
   setStatus(state.remoteChanged ? `${local} · Newer changes on GitHub: pull them with ↓` : local)

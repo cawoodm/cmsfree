@@ -1,59 +1,9 @@
-// Storage layer: the IndexedDB handle store (folder mode), the OPFS site root
-// (browser mode) and raw read/write/list/remove relative to `state.root`. No UI.
+// Storage layer: the OPFS site root and raw read/write/list/remove relative to `state.root`. No UI.
 import { state } from './state'
-import type { DirHandle, Entries } from './state'
+import type { Entries } from './state'
 
 // ---------------------------------------------------------------------------
-// IndexedDB — persist the picked folder handle across reloads (one per site)
-// ---------------------------------------------------------------------------
-const IDB_NAME = 'cmsfree'
-const IDB_STORE = 'handles'
-
-function idbOpen(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE)
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-export async function idbGetHandle(key: string): Promise<DirHandle | undefined> {
-  const db = await idbOpen()
-  return new Promise((resolve, reject) => {
-    const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get('folder:' + key)
-    req.onsuccess = () => resolve(req.result as DirHandle | undefined)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-export async function idbSetHandle(key: string, handle: DirHandle): Promise<void> {
-  const db = await idbOpen()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(IDB_STORE, 'readwrite')
-    tx.objectStore(IDB_STORE).put(handle, 'folder:' + key)
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-  })
-}
-
-// ---------------------------------------------------------------------------
-// File System Access — permission + pick
-// ---------------------------------------------------------------------------
-export async function verifyPermission(handle: DirHandle, request: boolean): Promise<boolean> {
-  const opts = { mode: 'readwrite' } as const
-  if ((await handle.queryPermission(opts)) === 'granted') return true
-  return request && (await handle.requestPermission(opts)) === 'granted'
-}
-
-export async function pickDirectory(key: string): Promise<DirHandle> {
-  const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
-  await idbSetHandle(key, handle)
-  return handle
-}
-
-// ---------------------------------------------------------------------------
-// OPFS — the browser-mode site folder: sites/<name>/
+// OPFS — the site folder: sites/<name>/
 // ---------------------------------------------------------------------------
 export async function opfsSiteRoot(name: string): Promise<FileSystemDirectoryHandle> {
   const root = await navigator.storage.getDirectory()
@@ -120,15 +70,6 @@ export async function listFiles(prefix: string): Promise<string[]> {
     /* folder missing */
   }
   return out
-}
-
-export async function dirExists(path: string): Promise<boolean> {
-  try {
-    await dirAt(path.split('/'))
-    return true
-  } catch {
-    return false
-  }
 }
 
 // Run an async task over items with bounded concurrency: each batch of `size`

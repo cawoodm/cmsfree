@@ -7,7 +7,7 @@
     "dev:multilingual": "npm run build:examples && vite --mode multilingual",
     "build": "vite build",
     "build:examples": "node scripts/build-examples.mjs",
-    "preview": "node scripts/serve-static.mjs example-site/dist 4173"
+    "preview": "node scripts/serve-static.mjs samples/example-site/dist 4173"
   },
   "devDependencies": {
     "vite": "^6.0.0"

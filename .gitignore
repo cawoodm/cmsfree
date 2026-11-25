@@ -1,9 +1,9 @@
 node_modules/
 dist/
 tmp/
-example-site*/dist/
+samples/*/dist/
 *.stackdump
-example-site*/static/cms.js
-example-site*/public/
-example-site*/resources/
+samples/*/static/cms.js
+samples/*/public/
+samples/*/resources/
 .hugo_build.lock

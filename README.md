@@ -29,15 +29,15 @@ See [docs/FORMAT.md](docs/FORMAT.md) for the format and the edit markers.
 
 ```bash
 npm install                  # Hugo (0.147+) must be on the PATH
-npm run dev                  # renders both examples, serves example-site at http://localhost:5173/
-npm run dev:multilingual     # serves example-site-multilingual (/en/, /de/)
+npm run dev                  # renders both examples, serves samples/example-site at http://localhost:5173/
+npm run dev:multilingual     # serves samples/example-site-multilingual (/en/, /de/)
 ```
 
-Open **http://localhost:5173/?edit** (multilingual: **/en/?edit**) and choose **Use local folder**, then pick `example-site/` (or `example-site-multilingual/`). Edits are written to its `content/` and `i18n/`; run `npm run build:examples` to render them.
+Open **http://localhost:5173/?edit** (multilingual: **/en/?edit**) and choose **Use local folder**, then pick `samples/example-site/` (or `samples/example-site-multilingual/`). Edits are written to its `content/` and `i18n/`; run `npm run build:examples` to render them.
 
 ```bash
 npm run build          # bundle the editor -> dist/cms.js (copy it to a site's static/cms.js)
-npm run preview        # serve example-site/dist on a plain static server
+npm run preview        # serve samples/example-site/dist on a plain static server
 ```
 
 ---

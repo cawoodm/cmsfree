@@ -3,12 +3,12 @@
 // static host (nginx, GitHub Pages, python -m http.server) would, proving the
 // published site + cms.js need nothing special at runtime.
 //
-// Usage: node scripts/serve-static.mjs [dir=example-site/publish] [port=4173]
+// Usage: node scripts/serve-static.mjs [dir=samples/example-site/dist] [port=4173]
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { join, extname, normalize, sep } from 'node:path'
 
-const root = process.argv[2] || 'example-site/publish'
+const root = process.argv[2] || 'samples/example-site/dist'
 const port = Number(process.argv[3]) || 4173
 
 const MIME = {

@@ -10,10 +10,10 @@ cmsfree is a backend-less editor for static sites that are plain Hugo sites (for
 
 ## Commands
 
-- `npm run dev` - builds both example sites (`build:examples`), then Vite serves `example-site/dist` (one language) at http://localhost:5173. Open `/?edit`. `npm run dev:multilingual` serves `example-site-multilingual/dist` instead (open `/en/?edit`). The dev plugin swaps any `<script src="…cms.js">` for `src/cms.ts` (hot reload).
+- `npm run dev` - builds both example sites (`build:examples`), then Vite serves `samples/example-site/dist` (one language) at http://localhost:5173. Open `/?edit`. `npm run dev:multilingual` serves `samples/example-site-multilingual/dist` instead (open `/en/?edit`). The dev plugin swaps any `<script src="…cms.js">` for `src/cms.ts` (hot reload).
 - `npm run build` - bundle `src/cms.ts` into one IIFE: `dist/cms.js`. Sites copy it to `static/cms.js`. Run it after changes under `src/` if you want the built file.
 - `npm run build:examples` - `scripts/build-examples.mjs`: `hugo -s <site> -d <site>/dist --cleanDestinationDir` for both example sites, then copies `dist/cms.js` into each output if present. Never `--minify` (it strips the markers).
-- `npm run preview` - serve `example-site/dist` on a plain static server (port 4173).
+- `npm run preview` - serve `samples/example-site/dist` on a plain static server (port 4173).
 
 There is no test framework and no lint/format script. Formatting is `.prettierrc` (no semicolons, single quotes, trailing commas, width 200).
 
@@ -54,4 +54,4 @@ Setup link: the settings dialog builds `<page>?edit#cmsfree=<base64url JSON of o
 ## Code style
 
 - Codified in `.prettierrc`. English identifiers and comments.
-- The engine is content-agnostic: `src/` must never hardcode anything about a specific site. `example-site/` and `example-site-multilingual/` are sample data, not part of the engine.
+- The engine is content-agnostic: `src/` must never hardcode anything about a specific site. `samples/example-site/` and `samples/example-site-multilingual/` are sample data, not part of the engine.

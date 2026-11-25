@@ -16,7 +16,7 @@ i18n/<lang>.yaml                   strings, one "key: text" line each
 static/cms.js                      the editor (copy of cmsfree dist/cms.js)
 ```
 
-See `example-site/` (one language) and `example-site-multilingual/` (en + de, default en). Hugo 0.147 or newer.
+See `samples/example-site/` (one language) and `samples/example-site-multilingual/` (en + de, default en). Hugo 0.147 or newer.
 
 ## hugo.toml
 
@@ -70,7 +70,7 @@ A `cms-items` block must start with a `### ` heading. A missing block or string 
 
 Use `cms-text` only in text context. Inside a tag or directly inside `<title>`, `<textarea>`, `<script>`, `<style>` a comment would show as text, so use `T` there. Those strings change on the page only after the next build.
 
-Language links: loop over `.AllTranslations` (see `example-site-multilingual/layouts/home.html`). Asset URLs: `relURL` or resource `.RelPermalink`. With `relativeURLs = true` Hugo turns every local `href`, `src` and `srcset` into a page-relative path (`/de/` becomes `../de/` on `/en/`), so the same build works at `https://example.org/` and at `https://user.github.io/repo/`. Keep canonical and `hreflang` links absolute (`.Permalink`, `absURL`). Hugo does not rewrite URLs inside `<script>`: compute those yourself (see Loader).
+Language links: loop over `.AllTranslations` (see `samples/example-site-multilingual/layouts/home.html`). Asset URLs: `relURL` or resource `.RelPermalink`. With `relativeURLs = true` Hugo turns every local `href`, `src` and `srcset` into a page-relative path (`/de/` becomes `../de/` on `/en/`), so the same build works at `https://example.org/` and at `https://user.github.io/repo/`. Keep canonical and `hreflang` links absolute (`.Permalink`, `absURL`). Hugo does not rewrite URLs inside `<script>`: compute those yourself (see Loader).
 
 ## Languages and fallback
 

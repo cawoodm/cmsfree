@@ -43,6 +43,15 @@ export default defineConfig(({ mode }) => ({
         if (ctx.file.startsWith(samplesDir.replace(/\\/g, '/') + '/')) return []
       },
     },
+    {
+      // BUILD ONLY: "/* CMSFree vX.Y.Z */" as the first line of cms.js, so a site's copy shows its version.
+      // Added in generateBundle, after minification, which would strip a rollup `banner`.
+      name: 'cms-version-banner',
+      apply: 'build',
+      generateBundle(_, bundle) {
+        for (const chunk of Object.values(bundle)) if (chunk.type === 'chunk') chunk.code = `/* CMSFree v${version} */\n${chunk.code}`
+      },
+    },
   ],
 
   build: {

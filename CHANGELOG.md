@@ -1,11 +1,8 @@
 # Changelog
 
-## Unreleased
+## 3.2.0 (2026-11-25)
 
-Housekeeping only; `cms.js` is unchanged, so no new version.
-
-- **Sample sites moved to `samples/`:** `samples/example-site/` and `samples/example-site-multilingual/`. `npm run dev`, `dev:multilingual`, `build:examples` and `preview` use the new paths. In folder mode, pick the sample folder under `samples/`.
-- The Vite dev server now also ignores writes under `samples/` on Windows (the old path check never matched there).
+- The built `cms.js` starts with a version comment: `/* CMSFree v3.2.0 */`.
 
 ## 3.1.0 (2026-11-25)
 

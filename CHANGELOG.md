@@ -1,17 +1,23 @@
 # Changelog
 
+## 4.3.0 (2026-11-25)
+
+- **Settings are checked on GitHub.** Save (and opening a setup link) checks owner, repository, token, branch and site folder; a problem marks its field red (amber for a warning such as "no blocks" or a read-only token) with the reason, and Save becomes "Save anyway". A wrong site folder names the folders that have a `hugo.toml`. A damaged setup link says so. The dialog title has a GitHub icon linking to the repo folder.
+
+### Fixed
+
+- Pull with a wrong site folder pulled nothing and silently kept the local copy (old content, no pencils). Pull now stops when the site folder has no `hugo.toml`.
+
 ## 4.2.0 (2026-11-25)
 
 - **↓ Pull and ↑ Push** in the edit bar (browser mode) replace the Publish button. ↓ brings in newer commits from GitHub and keeps unpublished edits to files GitHub did not change; a file changed on both sides asks first.
 - **Remote changes are flagged.** The editor checks the branch every minute (every 5 minutes without a token) and when the tab gets focus. New commits turn ↓ orange and add a note to the status line. On boot with unpublished edits it flags instead of asking to discard them.
 - **Copy the token** from the GitHub settings dialog (Copy button next to the field).
 - Saving another repo, branch or site folder in the settings reloads the editor, so it pulls that site.
-- **Settings are checked on GitHub.** Save (and opening a setup link) checks owner, repository, token, branch and site folder; a problem marks its field red (amber for a warning such as "no blocks" or a read-only token) with the reason, and Save becomes "Save anyway". A wrong site folder names the folders that have a `hugo.toml`. A damaged setup link says so. The dialog title has a GitHub icon linking to the repo folder.
 
 ### Fixed
 
 - Re-sync and pull could get an old branch head for up to a minute (the browser cached GitHub's `max-age=60` response) and so showed old content. API calls now bypass the cache.
-- Pull with a wrong site folder pulled nothing and silently kept the local copy (old content, no pencils). Pull now stops when the site folder has no `hugo.toml`.
 
 ## 4.1.0 (2026-11-25)
 

@@ -76,7 +76,8 @@ Language links: loop over `.AllTranslations` (see `example-site-multilingual/lay
 
 - A single-language site keeps blocks in `content/blocks/` and strings in `i18n/<defaultContentLanguage>.yaml`.
 - A multilingual site has `content/<lang>/blocks/` and `i18n/<lang>.yaml` per language, and builds `/<lang>/`.
-- Fallback: a block or string missing in a page's language comes from the **default content language**. There is no other fallback (no shared root folder).
+- Blocks have **no fallback**: every language needs every block it uses. A missing block stops the build with the expected path (`de: no block HERO.md (expected content/de/blocks/HERO.md)`).
+- Strings fall back to the **default content language**: Hugo's `T` does this and it cannot be turned off. There is no other fallback (no shared root folder).
 - A string key must not be named `description`, `other`, `one` or another go-i18n message field: Hugo then reads the whole file as one message. Use `meta_description`.
 
 `i18n/<lang>.yaml` is flat: one `key: text` line per string. Comments (`#`) and blank lines are allowed. Put the value in double quotes if it contains `: ` or ` #`, or starts with a YAML character such as `-`, `[`, `&` or `'`.
@@ -103,8 +104,8 @@ The markers carry no language. `cms.js` takes the page language from the URL: th
 
 - Files the editor loads and edits: `content/**/blocks/*.md` and `i18n/*.yaml`. `hugo.toml` is read only.
 - Languages: the folders `content/<lang>/` that contain `blocks/`. If `content/blocks/` exists instead, the site is single-language.
-- Lookup of a key: the page's language, then the default language.
-- Editing a key that came from the default language writes into the page's own language: the block file is created, or the key is added to `i18n/<lang>.yaml`.
+- Lookup of a block: the page's language only. Lookup of a string: the page's language, then the default language (as `T`).
+- Editing a missing block creates its file in the page's language. Editing a string that came from the default language adds the key to the page's `i18n/<lang>.yaml`.
 - The Texts panel lists the blocks that have a marker on the page and the strings of the page's language plus the default language's (as placeholder).
 - Browser mode pulls and publishes `content/**`, `i18n/**` and `hugo.toml` (never changed).
 - A re-render in the browser uses `marked` (gfm) and the same items split as `cms-items.html`.

@@ -24,8 +24,9 @@ const stringsOf = (lang: string): Record<string, string> => parseStrings(model.g
 const fileOf = (key: string, lang: string) => (isBlockKey(key) ? blockPath(lang, splitKey(key).name) : stringsPath(lang))
 
 // The source text for a key, the file it came from and whether that is not the page's own language.
+// Blocks come only from the page's language; strings fall back to the default language, like Hugo's T.
 function lookup(key: string): { text: string; file: string; fallback: boolean } | null {
-  for (const from of new Set([state.lang, state.defaultLang])) {
+  for (const from of new Set(isBlockKey(key) ? [state.lang] : [state.lang, state.defaultLang])) {
     const text = isBlockKey(key) ? model.get(blockPath(from, splitKey(key).name)) : stringsOf(from)[key]
     if (text !== undefined) return { text, file: fileOf(key, from), fallback: from !== state.lang }
   }

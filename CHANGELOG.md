@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.1.0 (2026-11-25)
+
+### Fixed
+
+- **No block fallback.** A block missing in a page's language no longer shows the default-language (English) block. It fails the build and names the expected file, e.g. `de: no block HERO.md (expected content/de/blocks/HERO.md)`. Copy the new `cms-block.html` and `cms-items.html` into your site.
+- The editor looks up blocks only in the page's language. Strings still fall back to the default language, because Hugo's `T` does that.
+- The multilingual example has its German `ABOUT.md` block again.
+
 ## 3.0.0 (2026-11-24)
 
 Sites are now plain Hugo sites. There is no custom build script and no `##placeholder##` template. Breaking change: sites in the 2.0 format must be converted (`docs/FORMAT.md`).

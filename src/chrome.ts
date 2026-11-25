@@ -182,13 +182,61 @@ export function setButtons(b: { texts?: boolean; publish?: boolean; publishEnabl
 }
 
 // A fresh modal <dialog> that removes itself when closed.
+// Esc and a click outside close it; Ctrl/Cmd+Enter clicks its primary button (OK, Save, Close).
 export function dialog(className = ''): HTMLDialogElement {
   injectStyles()
   const d = document.createElement('dialog')
   d.className = ('cms-dialog ' + className).trim()
+  // Blur first so a pending input "change" (Texts panel) still fires before the dialog goes away.
+  const dismiss = () => {
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    d.close()
+  }
+  d.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      dismiss()
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      ;(document.activeElement as HTMLElement | null)?.blur()
+      d.querySelector<HTMLButtonElement>('.cms-primary')?.click()
+    }
+  })
+  // Outside = on the backdrop. Both press and release must be outside, so a text selection dragged out of the box does not close it.
+  const outside = (e: MouseEvent) => {
+    const r = d.getBoundingClientRect()
+    return e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
+  }
+  let downOutside = false
+  d.addEventListener('mousedown', (e) => (downOutside = outside(e)))
+  d.addEventListener('click', (e) => {
+    if (downOutside && outside(e)) dismiss()
+    downOutside = false
+  })
   d.addEventListener('close', () => d.remove())
   document.body.append(d)
   return d
+}
+
+// An error dialog: a title and one paragraph per line, with Reload and Close.
+export function showError(title: string, lines: string[]): void {
+  const d = dialog()
+  const h = document.createElement('h2')
+  h.textContent = title
+  d.append(h)
+  for (const line of lines) {
+    const p = document.createElement('p')
+    p.textContent = line
+    d.append(p)
+  }
+  const row = document.createElement('div')
+  row.className = 'cms-row'
+  row.append(
+    button('Reload', '', () => location.reload()),
+    button('Close', 'cms-primary', () => d.close()),
+  )
+  d.append(row)
+  d.showModal()
 }
 
 // The "?" dialog: name, version, a link to the repo and a short pitch.
@@ -212,8 +260,5 @@ export function showAbout(): void {
   row.className = 'cms-row'
   row.append(button('Close', 'cms-primary', () => d.close()))
   d.append(title, version, pitch, linkLine, row)
-  d.addEventListener('click', (e) => {
-    if (e.target === d) d.close() // backdrop click
-  })
   d.showModal()
 }

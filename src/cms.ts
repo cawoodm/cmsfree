@@ -13,10 +13,10 @@
 import { MODE_PREFIX, model, state } from './state'
 import type { Mode, Settings } from './state'
 import { idbGetHandle, opfsSiteRoot, pickDirectory, verifyPermission } from './disk'
-import { barActions, isEditMode, isReturningEditor, rememberEditor, setButtons, setStatus, showEditLauncher } from './chrome'
+import { barActions, isEditMode, isReturningEditor, rememberEditor, setButtons, setStatus, showEditLauncher, showError } from './chrome'
 import { ConflictError, getHead, importSetupLink, loadSettings, openSettingsDialog, publish, pull, settingsComplete, siteFolderName, siteKey, watchBuild } from './github'
 import { changedFiles, flush, loadModel, readMeta, replaceContent, updateStatus, writeMeta } from './store'
-import { bindPage, initLang, openTexts, renderAll } from './page'
+import { bindPage, initLang, openTexts, rangeCounts, renderAll } from './page'
 
 let stopWatch: (() => void) | null = null
 
@@ -215,6 +215,18 @@ barActions.onSettings = () => {
   else if (confirm('Forget this folder and choose the storage mode again?')) changeMode()
 }
 
+// The site files loaded, but the page has no block markers, so there are no pencils to click.
+function warnIfNoBlocks(): void {
+  const { blocks, strings } = rangeCounts()
+  if (blocks) return
+  showError('No editable blocks on this page', [
+    `cmsfree loaded the site files but found no block markers (<!--cms:NAME.md-->) on this page${strings ? `, only ${strings} string marker(s)` : ''}. So there are no edit pencils.`,
+    'Old copy of the page: the browser may show a cached page from an earlier build. Reload with the cache off (Ctrl+Shift+R, or DevTools > Network > Disable cache).',
+    'Build without markers: the template must render blocks with the cms-block / cms-items partials, and the site must be built without --minify (it removes the markers).',
+    'If this page really has no blocks, edit its strings in Texts.',
+  ])
+}
+
 async function boot(): Promise<void> {
   if (!isEditMode()) {
     // View mode: dormant, except a returning editor gets a re-entry pencil.
@@ -235,6 +247,7 @@ async function boot(): Promise<void> {
   rememberEditor()
   initLang()
   bindPage()
+  warnIfNoBlocks()
   window.addEventListener('beforeunload', (e) => {
     if (state.savePending) {
       e.preventDefault()

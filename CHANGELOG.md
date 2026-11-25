@@ -18,6 +18,9 @@ Sites are now plain Hugo sites. There is no custom build script and no `##placeh
 - **Editor.** `cms.js` loads `content/**/blocks/*.md`, `i18n/*.yaml` and `hugo.toml` (read only, for the default language). The page language comes from the URL, lookup is own language then default language, edits go to the own language. Browser mode pulls and publishes the same file set.
 - `npm run build:examples` runs `hugo` for both examples (`scripts/build-examples.mjs`) and copies `dist/cms.js` into each output. Hugo must be on the PATH.
 - The Vite dev swap matches any `<script src="…cms.js">`.
+- **Dialogs.** Esc or a click outside closes every dialog; Ctrl/Cmd+Enter clicks its main button (OK, Save, Close). The Texts panel keeps a just-typed string when it closes this way.
+- **No blocks.** If a page in edit mode has no block markers (no pencils), an error dialog names the likely causes: a cached old page, a build without the cms partials or with `--minify`.
+- Hugo link render hook `hugo/layouts/_markup/render-link.html` keeps `tel:` links.
 
 ## 2.0.0 (2026-11-24)
 

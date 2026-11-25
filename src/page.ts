@@ -60,6 +60,12 @@ function scan(): void {
   }
 }
 
+// Marker ranges found by the last scan: blocks (they get pencils) and strings.
+export function rangeCounts(): { blocks: number; strings: number } {
+  const blocks = ranges.filter((r) => isBlockKey(r.key)).length
+  return { blocks, strings: ranges.length - blocks }
+}
+
 function domRange(r: Rng): Range {
   const range = document.createRange()
   range.setStartAfter(r.start)
@@ -160,12 +166,6 @@ export function openEditor(key: string): void {
   }
   d.querySelector('.cms-ok')!.addEventListener('click', ok)
   d.querySelector('.cms-cancel')!.addEventListener('click', () => d.close())
-  area.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault()
-      ok()
-    }
-  })
   d.showModal()
   area.focus()
 }

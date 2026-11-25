@@ -2,6 +2,8 @@ baseURL = "/"
 title = "Hearth & Wheat"
 defaultContentLanguage = "en"
 disableHugoGeneratorInject = true
+# Page-relative links and assets: the site works from the domain root and from a subfolder.
+relativeURLs = true
 disableKinds = ["section", "taxonomy", "term", "rss", "sitemap", "404"]
 
 # Blocks (content/blocks/*.md) are data for the partials, not pages.

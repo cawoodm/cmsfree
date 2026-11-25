@@ -15,7 +15,8 @@
       var hit = dirs.filter(function (d) { return d.toLowerCase() === full || d.toLowerCase() === short })[0]
       if (hit) { target = hit; break }
     }
-    location.replace({{ "/" | relURL }} + target + '/' + location.search + location.hash)
+    // Relative to this root page, so it also works when the site lives in a subfolder.
+    location.replace(target + '/' + location.search + location.hash)
   })()
 </script>
 <noscript><meta http-equiv="refresh" content="0; url={{ .Permalink }}"></noscript>

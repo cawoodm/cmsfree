@@ -24,6 +24,8 @@ Needed in every site:
 
 ```toml
 disableHugoGeneratorInject = true
+# Page-relative links and assets (../css/…): the site works from the domain root and from a subfolder.
+relativeURLs = true
 defaultContentLanguage = "en"
 disableKinds = ["section", "taxonomy", "term", "rss", "sitemap", "404"]
 
@@ -68,7 +70,7 @@ A `cms-items` block must start with a `### ` heading. A missing block or string 
 
 Use `cms-text` only in text context. Inside a tag or directly inside `<title>`, `<textarea>`, `<script>`, `<style>` a comment would show as text, so use `T` there. Those strings change on the page only after the next build.
 
-Language links: loop over `.AllTranslations` (see `example-site-multilingual/layouts/home.html`). Asset URLs: `relURL`, `absURL` or resource `.RelPermalink`.
+Language links: loop over `.AllTranslations` (see `example-site-multilingual/layouts/home.html`). Asset URLs: `relURL` or resource `.RelPermalink`. With `relativeURLs = true` Hugo turns every local `href`, `src` and `srcset` into a page-relative path (`/de/` becomes `../de/` on `/en/`), so the same build works at `https://example.org/` and at `https://user.github.io/repo/`. Keep canonical and `hreflang` links absolute (`.Permalink`, `absURL`). Hugo does not rewrite URLs inside `<script>`: compute those yourself (see Loader).
 
 ## Languages and fallback
 
@@ -116,7 +118,8 @@ The markers carry no language. `cms.js` takes the page language from the URL: th
   try {
     if (new URLSearchParams(location.search.toLowerCase()).has('edit') || localStorage.getItem('cmsfree:editor') === '1') {
       const cms = document.createElement('script')
-      cms.src = '{{ "cms.js" | relURL }}'
+      // One "../" per folder level of the page (/en/ -> ../cms.js): relativeURLs does not rewrite script strings.
+      cms.src = '{{ strings.Repeat (len (findRE `/` (strings.TrimPrefix `/` .RelPermalink))) `../` | safeJS }}cms.js'
       document.body.append(cms)
     }
   } catch {}

@@ -21,6 +21,7 @@ Sites are now plain Hugo sites. There is no custom build script and no `##placeh
 - **Dialogs.** Esc or a click outside closes every dialog; Ctrl/Cmd+Enter clicks its main button (OK, Save, Close). The Texts panel keeps a just-typed string when it closes this way.
 - **No blocks.** If a page in edit mode has no block markers (no pencils), an error dialog names the likely causes: a cached old page, a build without the cms partials or with `--minify`.
 - Hugo link render hook `hugo/layouts/_markup/render-link.html` keeps `tel:` links.
+- **Relative URLs.** The examples and `docs/FORMAT.md` use `relativeURLs = true`, so a site works from the domain root and from a subfolder (`user.github.io/repo/`). The multilingual root redirect and the editor loader use relative paths too.
 
 ## 2.0.0 (2026-11-24)
 

@@ -3,6 +3,8 @@ title = "Hearth & Wheat"
 defaultContentLanguage = "en"
 defaultContentLanguageInSubdir = true
 disableHugoGeneratorInject = true
+# Page-relative links and assets: the site works from the domain root and from a subfolder.
+relativeURLs = true
 disableKinds = ["section", "taxonomy", "term", "rss", "sitemap", "404"]
 
 [languages.en]

@@ -1,0 +1,478 @@
+:root {
+  --paper: #fbfaf7;
+  --ink: #1f2328;
+  --muted: #6b7178;
+  --line: #e6e2da;
+  --accent: #2f6f5e;
+  --card: #ffffff;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #16181b;
+    --ink: #e8e6e1;
+    --muted: #9aa0a6;
+    --line: #2c3035;
+    --accent: #7cc4ae;
+    --card: #1d2024;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font: 18px/1.65 var(--sans);
+  color: var(--ink);
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+}
+
+.wrap {
+  width: min(720px, 100% - 32px);
+  margin-inline: auto;
+}
+
+/* Header */
+.site-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+}
+
+.brand {
+  font: 700 22px/1 var(--serif);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* x-cms-nav renders ul > li.cms-nav-item > a(.active) */
+nav ul {
+  display: flex;
+  gap: 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 16px;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+nav a:hover {
+  color: var(--ink);
+}
+
+nav a.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+/* Main */
+main {
+  flex: 1;
+  padding: 48px 0 64px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--serif);
+  line-height: 1.2;
+}
+
+.hero h1 {
+  font-size: clamp(34px, 6vw, 48px);
+  margin: 0 0 16px;
+}
+
+.hero p {
+  font-size: 20px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.section-title {
+  margin: 56px 0 16px;
+  font-size: 14px;
+  font-family: var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.page-head h1 {
+  font-size: clamp(30px, 5vw, 42px);
+  margin: 0 0 8px;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 15px;
+  margin: 0 0 32px;
+}
+
+.prose h2 {
+  margin-top: 40px;
+}
+
+.prose li + li {
+  margin-top: 4px;
+}
+
+/* [include] wraps each included Block or Post in article.cms-include */
+.cms-include {
+  margin: 16px 0;
+  padding: 20px 24px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.cms-include h2 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+.cms-include h2 + p em {
+  font-size: 14px;
+  color: var(--muted);
+  font-style: normal;
+}
+
+.cms-include h3 {
+  margin-top: 24px;
+}
+
+/* Footer */
+.site-footer {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.site-footer .wrap {
+  padding: 24px 0;
+}
+
+@media (max-width: 520px) {
+  .site-header .wrap {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* edit-mode affordances (for later CMS engine wiring) */
+
+.cms-edit-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(74, 46, 32, 0.08);
+  color: var(--muted);
+  font-size: 0.85rem;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.cms-edit-icon:hover {
+  opacity: 1;
+  background: rgba(193, 102, 59, 0.16);
+  color: var(--accent);
+}
+
+/* edit-mode chrome (banner + source editor) */
+
+#cms-banner {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 0.65rem 1.25rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.9rem;
+}
+
+.cms-banner-btn {
+  border: 1px solid var(--paper);
+  background: transparent;
+  color: var(--paper);
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.cms-banner-btn:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.cms-spacer {
+  flex: 1 1 auto;
+}
+
+.cms-save {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  padding: 0.4rem 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.cms-save:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.cms-save:disabled {
+  opacity: 0.5;
+  cursor: default;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cms-publish {
+  border: 1px solid var(--paper);
+  background: transparent;
+  color: var(--paper);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.4rem 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.cms-publish:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.cms-deploy {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.4rem 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.cms-deploy:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.cms-deploy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cms-gear {
+  border: none;
+  background: transparent;
+  color: var(--paper);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  margin-left: 0.4rem;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.cms-gear:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* GitHub settings dialog */
+#cms-settings {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  max-width: 460px;
+  width: 92vw;
+  box-shadow: 0 20px 60px rgba(74, 46, 32, 0.35);
+  color: var(--ink);
+}
+
+#cms-settings::backdrop {
+  background: rgba(74, 46, 32, 0.45);
+}
+
+.cms-settings-form {
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.cms-settings-form h2 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.cms-settings-note {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.85rem;
+  min-height: 0;
+}
+
+.cms-settings-note:empty {
+  display: none;
+}
+
+.cms-settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.cms-settings-form label span {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.cms-settings-form input {
+  font: inherit;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid rgba(74, 46, 32, 0.3);
+  border-radius: 8px;
+}
+
+.cms-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.cms-done {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--paper);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--paper);
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.cms-done:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.cms-editor {
+  width: 100%;
+  min-height: 320px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 1rem;
+  border: 1px solid rgba(74, 46, 32, 0.25);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.cms-editor-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cms-btn {
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.cms-btn-save {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cms-btn-save:hover {
+  background: var(--accent);
+}
+
+.cms-btn-cancel {
+  background: rgba(74, 46, 32, 0.1);
+  color: var(--ink);
+}
+
+/* nav + content edit controls */
+.cms-nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.cms-nav-ctl {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  opacity: 0.55;
+  padding: 0.1rem 0.3rem;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.cms-nav-ctl:hover {
+  opacity: 1;
+  background: rgba(193, 102, 59, 0.16);
+  color: var(--accent);
+}
+
+.cms-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed rgba(74, 46, 32, 0.2);
+}

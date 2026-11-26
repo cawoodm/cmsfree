@@ -1,0 +1,12 @@
+[
+  {
+    "slug": "about",
+    "title": "About",
+    "order": 1
+  },
+  {
+    "slug": "posts",
+    "title": "Posts",
+    "order": 2
+  }
+]

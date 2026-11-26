@@ -1,0 +1,31 @@
+baseURL = "/"
+title = "Field Notes"
+defaultContentLanguage = "en"
+disableHugoGeneratorInject = true
+# Page-relative links and assets: the site works from the domain root and from a subfolder.
+relativeURLs = true
+disableKinds = ["taxonomy", "term", "rss", "sitemap", "404"]
+
+[params]
+author = "Mara Lindqvist"
+tagline = "Notes on slow travel, small kitchens and long walks."
+
+[[menus.main]]
+name = "Home"
+pageRef = "/"
+weight = 1
+[[menus.main]]
+name = "About"
+pageRef = "/about"
+weight = 2
+[[menus.main]]
+name = "Posts"
+pageRef = "/posts"
+weight = 3
+
+[markup.goldmark.parser]
+autoHeadingID = false
+[markup.goldmark.extensions.typographer]
+disable = true
+[markup.goldmark.renderer]
+unsafe = true

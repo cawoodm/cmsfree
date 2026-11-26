@@ -1,0 +1,67 @@
+<!doctype html>
+{{/* The only template: home (intro + latest posts), the posts list, the about page and each post. */}}
+{{ $posts := where site.RegularPages "Section" "posts" }}
+{{ $isList := or .IsHome (eq .Kind "section") }}
+<html lang="{{ site.Language.Lang }}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+    <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ site.Params.tagline }}{{ end }}" />
+    <link rel="stylesheet" href="{{ "css/site.css" | relURL }}" />
+  </head>
+  <body class="kind-{{ .Kind }}">
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="{{ "/" | relURL }}">{{ site.Title }}</a>
+        <nav>
+          {{ $current := . }}
+          {{ range site.Menus.main }}
+            <a href="{{ .URL | relURL }}"{{ if or ($current.IsMenuCurrent "main" .) ($current.HasMenuCurrent "main" .) }} aria-current="page"{{ end }}>{{ .Name }}</a>
+          {{ end }}
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      {{ if .IsHome }}
+        <section class="hero">{{ .Content }}</section>
+        <h2 class="section-title">Latest posts</h2>
+      {{ else }}
+        <article class="prose">
+          <header class="page-head">
+            <h1>{{ .Title }}</h1>
+            {{ if and .IsPage (eq .Section "posts") }}
+              <p class="meta"><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2 January 2006" }}</time> · {{ .ReadingTime }} min read</p>
+            {{ end }}
+          </header>
+          {{ .Content }}
+        </article>
+      {{ end }}
+
+      {{ if $isList }}
+        <ul class="post-list">
+          {{ range cond .IsHome (first 3 $posts) $posts }}
+            <li>
+              <a class="card" href="{{ .RelPermalink }}">
+                <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2 Jan 2006" }}</time>
+                <h3>{{ .Title }}</h3>
+                <p>{{ .Summary | plainify }}</p>
+              </a>
+            </li>
+          {{ end }}
+        </ul>
+      {{ end }}
+
+      {{ if .IsHome }}
+        <p class="more"><a href="{{ "posts/" | relURL }}">All posts →</a></p>
+      {{ else if and .IsPage (eq .Section "posts") }}
+        <p class="more"><a href="{{ "posts/" | relURL }}">← All posts</a></p>
+      {{ end }}
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">© {{ now.Year }} {{ site.Params.author }} · {{ site.Params.tagline }}</div>
+    </footer>
+  </body>
+</html>

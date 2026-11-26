@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Field Notes</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <!--
+  Legacy cmsfree layout template (pre-Hugo format, see docs/CONCEPTS.md).
+  The single source of page layout, for Publish and for edit mode:
+    <nav x-cms-nav>       -> the section nav (generated from section folders)
+    <main x-cms-content>  -> the page's rendered markdown
+    x-cms-block="_name.md" -> a root-level Block (hero, footer)
+    data-cms-show="..."   -> a JS expression against the current page
+-->
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="#/">Field Notes</a>
+        <nav class="site-nav" x-cms-nav></nav>
+      </div>
+    </header>
+
+    <section class="hero wrap" data-cms-show="page.slug === 'home'">
+      <div x-cms-block="_hero.md"></div>
+    </section>
+
+    <main class="wrap prose" x-cms-content></main>
+
+    <footer class="site-footer">
+      <div class="wrap" x-cms-block="_footer.md"></div>
+    </footer>
+
+    <!-- cms:entry -->
+  </body>
+</html>

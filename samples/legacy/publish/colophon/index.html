@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colophon</title>
+    <link rel="stylesheet" href="../css/style.css">
+  </head>
+  <body>
+    
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="../">Field Notes</a>
+        <nav class="site-nav" x-cms-nav=""><ul><li><a href="../about/">About</a></li><li><a href="../posts/">Posts</a></li></ul></nav>
+      </div>
+    </header>
+
+    
+
+    <main class="wrap prose" x-cms-content=""><h1>Colophon</h1>
+<p>This page is a hidden section: the folder is <code>content/_colophon/</code>, so it is published at <code>/colophon/</code> but left out of the nav. The footer links to it.</p>
+<p>Field Notes is a sample site in the legacy cmsfree content format. Every file kind from <code>docs/CONCEPTS.md</code> appears once:</p>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>File</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Section</td>
+<td><code>about/index.md</code>, <code>posts/index.md</code></td>
+</tr>
+<tr>
+<td>Page</td>
+<td><code>posts/packing-list.md</code></td>
+</tr>
+<tr>
+<td>Block</td>
+<td><code>_hero.md</code>, <code>_footer.md</code>, <code>posts/_subscribe.md</code></td>
+</tr>
+<tr>
+<td>Post</td>
+<td><code>posts/index.post-*.md</code></td>
+</tr>
+<tr>
+<td>Hidden section</td>
+<td><code>_colophon/index.md</code></td>
+</tr>
+<tr>
+<td>Hidden file</td>
+<td><code>.draft.md</code></td>
+</tr>
+</tbody></table>
+</main>
+
+    <footer class="site-footer">
+      <div class="wrap" x-cms-block="_footer.md"><p>© 2026 Mara Lindqvist · Notes on slow travel, small kitchens and long walks. · <a href="../colophon/">Colophon</a></p>
+</div>
+    </footer>
+
+    <script src="../cms.js"></script>
+  </body>
+</html>
